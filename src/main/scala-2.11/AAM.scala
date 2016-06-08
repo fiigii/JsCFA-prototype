@@ -76,7 +76,7 @@ object AAM {
           seen.add(next)
           todo = next :: todo
         } else {
-          //println("\n\nSEEN: " + next)
+          println("\n\nSEEN: " + next)
         }
       }
     }
@@ -732,6 +732,11 @@ object AAM {
 
     case State(f@FunctionExpr(name, ps, body), env, localStack, a, memory) =>
       val newMemory = memory.copy(state)
+      /*
+      val closureEnv = name match {
+        case None => env
+        case Some(i@IntroduceVar(functionName)) => updateEnv(env, functionName, alloc(i))
+      } */
       val functionObject = createFunctionObject(f, env, newMemory)
       val value = newMemory.save(functionObject)
       Set(State(value, env, localStack, a, newMemory))

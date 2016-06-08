@@ -12,6 +12,7 @@ case class EmptyExpr() extends Expression
 case class FunctionExpr(name : Option[IntroduceVar], ps : List[IntroduceVar], body : Statement) extends Expression with ObjectGeneratePoint{
   var sourceCode : String = ""
   var prototypeID : Label = -1
+  var freeVariables = Set.empty[String]
 }
 case class VarRef(name : String) extends Expression with VariableAccess
 case class ThisRef() extends Expression

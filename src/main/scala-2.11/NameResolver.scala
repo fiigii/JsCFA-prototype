@@ -11,24 +11,29 @@ object NameResolver {
 
   def apply(script: Statement) : Unit = resolveStatement(script, initEnv)
 
-  def resolveStatement(stmt : Statement, env: Environment) : Unit = stmt match {
+  def resolveStatement(stmt : Statement, env: Environment) : Set[String] = stmt match {
     case s@Script(stmts) =>
       val newEnv = env ++ extractDecl(s).toMap
       for(s <- stmts){
         resolveStatement(s, newEnv)
       }
+      Set()
 
     case block : BlockStmt =>
+      val fvs = scala.collection.mutable.Set.empty[String]
       for(s <- block.stmts) {
-        resolveStatement(s, env)
+        fvs ++= resolveStatement(s, env)
       }
+      fvs.toSet
 
     case decls : VarDeclListStmt =>
+      val fvs = scala.collection.mutable.Set.empty[String]
       for(d <- decls.decls) {
-        resolveStatement(d, env)
+        fvs ++= resolveStatement(d, env)
       }
+      fvs.toSet
 
-    case _ : EmptyStmt =>
+    case _ : EmptyStmt => Set()
 
     case exprStmt : ExprStmt => resolveExpression(exprStmt.expr, env)
 
@@ -39,66 +44,72 @@ object NameResolver {
     case ret : ReturnStmt => resolveExpression(ret.expr, env)
 
     case cond : IfStmt =>
-      resolveExpression(cond.cond, env)
-      resolveStatement(cond.thenPart, env)
+      resolveExpression(cond.cond, env) ++
+      resolveStatement(cond.thenPart, env) ++
       resolveStatement(cond.elsePart, env)
 
     case sw : SwitchStmt =>
-      resolveExpression(sw.cond, env)
+      val fvs = scala.collection.mutable.Set.empty[String]
+      fvs ++= resolveExpression(sw.cond, env)
       for(c <- sw.cases) {
-        resolveExpression(c.expr, env)
-        resolveStatement(c.body, env)
+        fvs ++= resolveExpression(c.expr, env)
+        fvs ++= resolveStatement(c.body, env)
       }
       sw.defaultCase match {
         case None =>
-        case Some(caseStmt) => resolveStatement(caseStmt, env)
+        case Some(caseStmt) => fvs ++= resolveStatement(caseStmt, env)
       }
+      fvs.toSet
 
     case c : CaseStmt =>
-      resolveExpression(c.expr, env)
+      resolveExpression(c.expr, env) ++
       resolveStatement(c.body, env)
 
-    case _ : BreakStmt =>
+    case _ : BreakStmt => Set()
 
-    case _ : ContinueStmt =>
+    case _ : ContinueStmt => Set()
 
     case dw : DoWhileStmt =>
-      resolveExpression(dw.cond, env)
+      resolveExpression(dw.cond, env) ++
       resolveStatement(dw.body, env)
 
     case wh : WhileStmt =>
-      resolveExpression(wh.cond, env)
+      resolveExpression(wh.cond, env) ++
       resolveStatement(wh.body, env)
 
     case forStmt : ForStmt =>
-      resolveForInit(forStmt.init, env)
+      val fvs = scala.collection.mutable.Set.empty[String]
+      fvs ++= resolveForInit(forStmt.init, env)
       forStmt.cond match {
         case None =>
-        case Some(expr) => resolveExpression(expr, env)
+        case Some(expr) => fvs ++= resolveExpression(expr, env)
       }
       forStmt.increment match {
         case None =>
-        case Some(inc) => resolveExpression(inc, env)
+        case Some(inc) => fvs ++= resolveExpression(inc, env)
       }
-      resolveStatement(forStmt.body, env)
+      fvs ++= resolveStatement(forStmt.body, env)
+      fvs.toSet
 
     case forIn : ForInStmt =>
-      resolveExpression(forIn.expr, env)
-      resolveForInInit(forIn.init, env)
+      resolveExpression(forIn.expr, env) ++
+      resolveForInInit(forIn.init, env) ++
       resolveStatement(forIn.body, env)
 
     case l : LabeledStmt =>
       resolveStatement(l.stmt, env)
 
     case tr : TryStmt =>
-      resolveStatement(tr.body, env)
+      val fvs = scala.collection.mutable.Set.empty[String]
+      fvs ++= resolveStatement(tr.body, env)
       for (c <- tr.catchClause) {
-        resolveStatement(c, env)
+        fvs ++= resolveStatement(c, env)
       }
       tr.finalCatch match {
         case None =>
-        case Some(s) => resolveStatement(s, env)
+        case Some(s) => fvs ++= resolveStatement(s, env)
       }
+      fvs.toSet
 
     case c : CatchStmt =>
       val newEnv = env + (c.name.str -> c.name)
@@ -110,83 +121,114 @@ object NameResolver {
     case err => throw new RuntimeException("Wrong Pattern: " + err)
   }
 
-  def resolveExpression(expression : Expression, env: Environment) : Unit = expression match {
-    case FunctionExpr(_, ps, body) =>
+  def resolveExpression(expression : Expression, env: Environment) : Set[String] = expression match {
+    case f@FunctionExpr(_, ps, body) =>
       val psEnv = ps.map((name) => name.str -> name).toMap
-      val localEnv = extractDecl(body)
-      resolveStatement(body, psEnv ++ localEnv)
+      val localEnv = psEnv ++ extractDecl(body)
+      val vs = resolveStatement(body, localEnv)
+      val fvs = vs.diff(localEnv.keys.toSet)
+      if(fvs.nonEmpty) f.freeVariables = fvs
+      fvs
 
     case x@VarRef(name) => env get name match {
       case None =>
       case Some(v) => x.referTo = v
     }
+      Set(name)
 
     case DotRef(obj, _) => resolveExpression(obj, env)
     case BracketRef(obj, prop) =>
-      resolveExpression(obj, env)
+      resolveExpression(obj, env) ++
       resolveExpression(prop, env)
 
     case MethodCall(receiver, method, args) =>
-      resolveExpression(receiver, env)
-      resolveExpression(method, env)
-      args.foreach(resolveExpression(_, env))
+      val fvs = scala.collection.mutable.Set.empty[String]
+      fvs ++= resolveExpression(receiver, env)
+      fvs ++ resolveExpression(method, env)
+      args.foreach {
+        case a => fvs ++= resolveExpression(a, env)
+      }
+      fvs.toSet
 
     case FuncCall(func, args) =>
-      resolveExpression(func, env)
-      args.foreach(resolveExpression(_, env))
+      val fvs = scala.collection.mutable.Set.empty[String]
+      fvs ++= resolveExpression(func, env)
+      args.foreach{
+        fvs ++= resolveExpression(_, env)
+      }
+      fvs.toSet
 
     case NewCall(func, args) =>
-      resolveExpression(func, env)
-      args.foreach(resolveExpression(_, env))
+      val fvs = scala.collection.mutable.Set.empty[String]
+      fvs ++= resolveExpression(func, env)
+      args.foreach{
+        fvs ++= resolveExpression(_, env)
+      }
+      fvs.toSet
 
     case AssignExpr(_, lv, expr) =>
-      resolveLValue(lv, env)
+      resolveLValue(lv, env) ++
       resolveExpression(expr, env)
 
     case ObjectLit(obj) =>
+      val fvs = scala.collection.mutable.Set.empty[String]
       for(ObjectPair(_, expr) <- obj) {
-        resolveExpression(expr, env)
+        fvs ++= resolveExpression(expr, env)
       }
+      fvs.toSet
 
-    case ArrayLit(array) => array.foreach(resolveExpression(_, env))
+    case ArrayLit(array) =>
+      val fvs = scala.collection.mutable.Set.empty[String]
+      array.foreach {
+        fvs ++= resolveExpression(_, env)
+      }
+      fvs.toSet
 
-    case UnaryAssignExpr(_, lv) =>  resolveLValue(lv, env)
+    case UnaryAssignExpr(_, lv) => resolveLValue(lv, env)
 
     case PrefixExpr(_, expr) => resolveExpression(expr, env)
 
     case InfixExpr(_, e1, e2) =>
-      resolveExpression(e1, env)
+      resolveExpression(e1, env) ++
       resolveExpression(e2, env)
 
     case CondExpr(e1, e2, e3) =>
-      resolveExpression(e1, env)
-      resolveExpression(e2, env)
+      resolveExpression(e1, env) ++
+      resolveExpression(e2, env) ++
       resolveExpression(e3, env)
 
-    case ListExpr(lst) => lst.foreach(resolveExpression(_, env))
-    case _ =>
+    case ListExpr(lst) =>
+      val fvs = scala.collection.mutable.Set.empty[String]
+      lst.foreach{
+        fvs ++= resolveExpression(_, env)
+      }
+      fvs.toSet
+    case _ => Set()
   }
 
-  def resolveForInit(init : ForInit, env: Environment) : Unit = init match {
-    case NoneInit() =>
+  def resolveForInit(init : ForInit, env: Environment) : Set[String] = init match {
+    case NoneInit() => Set()
     case VarListInit(decls) => resolveStatement(decls, env)
     case VarInit(varDecl) => resolveStatement(varDecl, env)
     case ExprInit(expr) => resolveExpression(expr, env)
   }
 
-  def resolveForInInit(init : ForInInit, env : Environment) : Unit = init match {
-    case ForInVarDecl(name) =>
+  def resolveForInInit(init : ForInInit, env : Environment) : Set[String] = init match {
+    case ForInVarDecl(name) => Set()
     case ForInLValue(lv) => resolveLValue(lv, env)
   }
 
-  def resolveLValue(lv : LValue, env : Environment) : Unit = lv match {
-    case lvar : LVarRef => env get lvar.name match {
-      case None =>
-      case Some(x) => lvar.referTo = x
-    }
+  def resolveLValue(lv : LValue, env : Environment) : Set[String] = lv match {
+    case lvar : LVarRef =>
+      env get lvar.name match {
+        case None =>
+        case Some(x) => lvar.referTo = x
+      }
+      Set(lvar.name)
+
     case dot : LDot => resolveExpression(dot.obj, env)
     case bracket : LBracket =>
-      resolveExpression(bracket.computeField, env)
+      resolveExpression(bracket.computeField, env) ++
       resolveExpression(bracket.obj, env)
   }
 
