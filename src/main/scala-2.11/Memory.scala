@@ -85,7 +85,7 @@ case class Memory(store : mutable.Map[JSReference, Set[JSValue]], stack : mutabl
     }
 
 
-    val newList = newStore.toList.map {
+    val copiedStore = newStore.map {
       case (ref, setValue) =>
         val newSet = setValue.map {
           case o : JSObject => o.copy
@@ -98,8 +98,7 @@ case class Memory(store : mutable.Map[JSReference, Set[JSValue]], stack : mutabl
       case (ref, _) => markSetK.contains(ref)
     }
 
-    val newMemory = Memory(mutable.Map(newList:_*), mutable.Map(newStack.toList:_*))
-    //startGC(state, newMemory)
+    val newMemory = Memory(copiedStore, newStack)
     newMemory
   }
 

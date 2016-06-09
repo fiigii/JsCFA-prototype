@@ -100,7 +100,7 @@ case class JSObject(content : scala.collection.mutable.Map[JSString, JSReference
 
   override def toString = {
     if(code != null) {
-      "FunctionObject : " + code.function
+      "FunctionObject : \n" + code.function.sourceCode
     } else {
       val strArr = content.map {
         case (k, v) => "        " + k + " -> " + v + "\n"

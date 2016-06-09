@@ -117,12 +117,12 @@ object GarbageCollector {
 
   def trace(ref : JSReference, memory: Memory): Unit ={
     if(!ref.isBuiltIn && memory.store.contains(ref) && !markSet.contains(ref)) {
+      markSet.add(ref)
+
       memory.getValue(ref).foreach {
         case obj@JSObject(content) =>
-          //markSet.add(ref)
           content.foreach {
             case (name, value) =>
-              markSet.add(value)
               trace(value, memory)
           }
           if(obj.code != null) {
@@ -132,13 +132,11 @@ object GarbageCollector {
                 env.get(freeVar) match {
                   case None =>
                   case Some(freeRef) =>
-                    markSet.add(freeRef)
                     trace(freeRef, memory)
                 }
             }
           }
-          markSet.add(ref)
-        case other => markSet.add(ref)
+        case other => //markSet.add(ref)
       }
     }
   }
