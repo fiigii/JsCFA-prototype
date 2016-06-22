@@ -51,13 +51,21 @@ object JSBuiltIn {
   val biArrayProtoRef = JSReference(freshBuiltInID)
   val biArrayLengthRef = JSReference(freshBuiltInID)
 
+  //Math
+  val biMathRef = JSReference(freshBuiltInID)
+  val biPIRef = JSReference(freshBuiltInID)
+  val bisinRef = JSReference(freshBuiltInID)
+  val bisqrtRef = JSReference(freshBuiltInID)
+  val biabsRef = JSReference(freshBuiltInID)
+
 
   val builtInEnv : AAM.Environment = Map(
     "Object" -> biObjectRef,
     "Function" -> biFunctionRef,
     "RegExp" -> biRegExpRef,
     "Array" -> biArrayRef,
-    "global" -> biGlobalObjectRef
+    "global" -> biGlobalObjectRef,
+    "Math" -> biMathRef
   )
 
   private def freshBuiltInID = {
@@ -76,6 +84,7 @@ object JSBuiltIn {
     createRegExp
     createGlobalObject
     createArray
+    createMath
     initMemory.stack += startAddress -> Set(startFrame)
     initMemory
   }
@@ -165,4 +174,59 @@ object JSBuiltIn {
     initMemory.store(biArrayRef) = Set(array)
     array
   }
+
+
+  def createMath : JSObject = {
+    val math = initMemory.createEmptyObject(biObjectProtoRef, biObjectRef)
+    initMemory.store(biMathRef) =  Set(math)
+    math.content += (JSString(ConstantString("PI")) -> biPIRef)
+    initMemory.store(biPIRef) = Set(JSNumber(ConstantNumber(3.141592653589793)))
+    math.content += (JSString(ConstantString("sin")) -> bisinRef)
+    initMemory.store(bisinRef) = Set(builtInFuntion(bisinRef))
+    math.content += (JSString(ConstantString("sqrt")) -> bisqrtRef)
+    initMemory.store(bisqrtRef) = Set(builtInFuntion(bisqrtRef))
+    math.content += (JSString(ConstantString("abs")) -> biabsRef)
+    initMemory.store(biabsRef) = Set(builtInFuntion(biabsRef))
+    math
+  }
+
+  private def builtInFuntion(ref : JSReference) : JSObject = {
+    val obj = JSObject(collection.mutable.Map())
+    obj.code = JSClosure(FunctionExpr(None, Nil, EmptyStmt()), Map())
+    obj.builtIn = ref
+    obj
+  }
+
+  def methodBuiltInCall(receiver : JSObject, method : JSObject, args : List[JSValue], state : State) : State = {
+    val funcs = Set(bisqrtRef, bisinRef, biabsRef)
+    method.builtIn match {
+      case func if funcs.contains(func) => funcBuiltInCall(method, args, state)
+    }
+  }
+
+  def funcBuiltInCall(func : JSObject, args : List[JSValue], state : State) : State = {
+    func.builtIn match {
+      case sin if sin == bisinRef =>
+        val value = JSNumber(VariableNumber)
+        value.generateFrom(state.e)
+        val newMemory = state.memory.copy(state)
+        val address = newMemory.save(value)
+        State(address, state.env, state.localStack, state.a, newMemory)
+
+      case sqrt if sqrt == bisqrtRef =>
+        val value = JSNumber(VariableNumber)
+        value.generateFrom(state.e)
+        val newMemory = state.memory.copy(state)
+        val address = newMemory.save(value)
+        State(address, state.env, state.localStack, state.a, newMemory)
+
+      case abs if abs == biabsRef =>
+        val value = JSNumber(VariableNumber)
+        value.generateFrom(state.e)
+        val newMemory = state.memory.copy(state)
+        val address = newMemory.save(value)
+        State(address, state.env, state.localStack, state.a, newMemory)
+    }
+  }
+
 }

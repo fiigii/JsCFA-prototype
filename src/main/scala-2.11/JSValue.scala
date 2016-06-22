@@ -25,6 +25,7 @@ case class JSClosure(function: FunctionExpr, env : AAM.Environment)
 
 case class JSObject(content : scala.collection.mutable.Map[JSString, JSReference]) extends JSValue {
   var code : JSClosure = null
+  var builtIn : JSReference = null
   def lookup(field : JSString, memory: Memory) : Set[JSReference] = {
     val proto = JSString(ConstantString("__proto__"))
     if(content.contains(field)) {
@@ -86,8 +87,9 @@ case class JSObject(content : scala.collection.mutable.Map[JSString, JSReference
   }
 
   def copy : JSObject = {
-    val obj = JSObject(mutable.Map(this.content.toList:_*))
+    val obj = JSObject(this.content)
     obj.code = this.code
+    obj.builtIn = this.builtIn
     if(this.hasID)obj.generateFrom(this)
     obj
   }

@@ -5,24 +5,17 @@ import java.io.File
   */
 object Main {
   def main(args: Array[String]) {
-    val ast = GenerateAST(new File("test.js"))
+    val ast = GenerateAST(new File("benchmark/sunspider-3d-raytrace.js"))
+    //val ast = GenerateAST(new File("test.js"))
     val decedAST = DecorateAST(ast)
     NameResolver(decedAST)
     val disk = AAM.analyze(decedAST)
-
+    /*
     println("AST :")
     DecorateAST.mapToAST.foreach{
       case (id, t) => println(id + " :: " + t)
     }
-
-    println("\n\nDisk")
-    disk.foreach{
-      case (address, set)  =>
-        println("\n" + address + " -> ")
-        set.foreach {
-          case o => println("    " + o)
-        }
-    }
+    */
 
     println("\n\nResult : ")
     DecorateAST.mapToAST.foreach {

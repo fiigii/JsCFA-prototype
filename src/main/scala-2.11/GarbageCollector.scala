@@ -100,7 +100,7 @@ object GarbageCollector {
       v match {
         case ref : JSReference => res += ref
         case KObjectPairPack(_, value) => res ++= rootSet(value)
-        case k : Continuation if AAM.isRead(k) => res ++= rootSet(k)
+        case k : Continuation if AAMHelper.isComplete(k) => res ++= rootSet(k)
         case _ =>
       }
     }
@@ -125,7 +125,7 @@ object GarbageCollector {
             case (name, value) =>
               trace(value, memory)
           }
-          if(obj.code != null) {
+          if(obj.code != null && obj.builtIn == null) {
             val env = obj.code.env
             obj.code.function.freeVariables.foreach {
               case freeVar =>

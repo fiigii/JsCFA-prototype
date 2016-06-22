@@ -1,3 +1,5 @@
+import JSSemantics._
+
 /**
   * Created by Fei Peng on 3/30/16.
   */
@@ -5,6 +7,7 @@
 object AAM {
   import JSSemantics._
   import JSBuiltIn._
+  import AAMHelper._
 
   case class StackAddress(e: AbstractSyntaxTree.Label, env: AbstractSyntaxTree.Label)
 
@@ -24,7 +27,7 @@ object AAM {
   type Disk = scala.collection.mutable.Map[JSReference, AbstractValue]
 
 
-  case class State(e: AbstractSyntaxTree, env: Environment, localStack: LocalStack, a: StackAddress, var memory: Memory) {
+  case class State(e: AbstractSyntaxTree, env: Environment, localStack: LocalStack, a: StackAddress, memory: Memory) {
     override def toString = {
       "State :\nControl String :" + e.id + " " + e + "\nEnv :" + env + "\nLocal Stack:" +
         localStack + "\na:" + a + "\nOld Stack :" + showOldStack(a)// + "\nStore" + memory.show
@@ -65,10 +68,16 @@ object AAM {
       val currentState = todo.head
       todo = todo.tail
 
-      println("\nState : " + i)
+      //println("\nState : " + i)
       i += 1
-      println("" + currentState + "\n")
-
+      //println(currentState + "\n")
+      /*
+      println("\nStack :")
+      for ((p,f) <- currentState.memory.stack) {
+        println(p + " -> ")
+        println("    " + f)
+      }
+      */
       val nextStates = transitEvaluation(currentState)
 
       for (next <- nextStates) {
@@ -76,7 +85,7 @@ object AAM {
           seen.add(next)
           todo = next :: todo
         } else {
-          println("\n\nSEEN: " + next)
+          //println("\n\nSEEN: " + next)
         }
       }
     }
@@ -88,7 +97,7 @@ object AAM {
 
   def transitEvaluation(state: State): Set[State] = state match {
     //Application
-    case State(complete, _, _, _, _) if isRead(complete) => transitApplication(state)
+    case State(complete, _, _, _, _) if isComplete(complete) => transitApplication(state)
     //Evaluation
     //Statement
 
@@ -115,11 +124,13 @@ object AAM {
 
     case State(ExprStmt(e), env, localStack, a, memory) => Set(State(e, env, localStack, a, memory))
 
-    case State(VarDeclStmt(x, e), env, localStack, a, memory) =>
-      val k = KVarDeclStmt(x)
+    case State(VarDeclStmt(name, e), env, localStack, a, memory) =>
+      val k = KVarDeclStmt(name)
       k.generateFrom(state.e)
       val newStack = pushLocalStack(localStack, k)
-      Set(State(e, env, newStack, a, memory))
+      val newAddress = alloc(name)
+      val newEnv = updateEnv(env, name.str, newAddress)
+      Set(State(e, newEnv, newStack, a, memory))
 
 
     case State(f@FunctionDecl(x, body), env, localStack, a, memory) =>
@@ -225,6 +236,11 @@ object AAM {
       val newStack = pushLocalStack(localStack, k)
       Set(State(e, env, newStack, a, memory))
 
+    case State(ArrayLit(Nil), env, localStack, a, memory) =>
+      val k = KArrayComplete(Nil)
+      k.generateFrom(state.e)
+      Set(State(k, env, localStack, a, memory))
+
     case State(ArrayLit(ele :: es), env, localStack, a, memory) =>
       val k = KArrayLit(Nil, es)
       k.generateFrom(state.e)
@@ -292,7 +308,8 @@ object AAM {
     case State(v, env, localStack, a, memory) if isJSValue(v) =>
       if (localStack.nonEmpty) {
         val cont = topOfLocalStack(localStack)
-        transitContinuation(cont, v.asInstanceOf[JSValue], env, popLocalStack(localStack), a, memory)
+        val newStack = popLocalStack(localStack)
+        transitContinuation(cont, v.asInstanceOf[JSValue], env, newStack, a, memory)
       } else if (a != startAddress) {
         for {
           GlobalFrame(returnPoint, oldStack, savedEnv, newGlobalAddress) <- memory.globalFrames(a)
@@ -528,6 +545,11 @@ object AAM {
       k.generateFrom(cont)
       Set(State(k, env, localStack, a, memory))
 
+    case KPrefix(op) =>
+      val k = KPrefixExprComplete(op, value)
+      k.generateFrom(cont)
+      Set(State(k, env, localStack, a, memory))
+
     case KUnaryAssign(op) =>
       val k = KUnaryAssignComplete(op, value)
       k.generateFrom(cont)
@@ -589,7 +611,7 @@ object AAM {
     //Special
     case KUseValue(v) => Set(State(v, env, localStack, a, memory))
 
-    case complete if isRead(complete) => transitApplication(State(complete, env, localStack, a, memory))
+    case complete if isComplete(complete) => transitApplication(State(complete, env, localStack, a, memory))
 
     case _ => throw new RuntimeException("Unmatched continuation " + cont)
   }
@@ -614,7 +636,9 @@ object AAM {
         GlobalFrame(returnPoint, oldStack, savedEnv, newGlobalAddress) <- newMemory.globalFrames(a)
       } yield {
         if(oldStack.isEmpty || !oldStack.head.isInstanceOf[KUseValue]) {
-          newMemory.getValue(v).foreach(newMemory.putValue(returnPoint, _))
+          for(vs <- newMemory.getValue(v)) {
+            newMemory.putValue(returnPoint, vs)
+          }
         }
         State(returnPoint, savedEnv, oldStack, newGlobalAddress, newMemory)
       }
@@ -717,11 +741,12 @@ object AAM {
 
     //Expressions
     case State(VarRef(x), env, localStack, a, memory) =>
-      val newMemory = memory.copy(state)
       val xRef = lookup(env, x)
-      newMemory.getValue(xRef).foreach(newMemory.putValue(JSReference(state.e.id), _))
+      val newMemory = memory.copy(state)
+      for(vs <- newMemory.getValue(xRef)){
+        newMemory.putValue(JSReference(state.e.id), vs)
+      }
       Set(State(JSReference(state.e.id), env, localStack, a, newMemory))
-
 
     case State(ThisRef(), env, localStack, a, memory) =>
       val newMemory = memory.copy(state)
@@ -782,6 +807,7 @@ object AAM {
     case State(KDotRefComplete(objRef, prop), env, localStack, a, memory) =>
       for {
         obj <- memory.getValue(objRef)
+        if canToObject(obj)
         o = ToObject(obj)
         value <- o.lookup(JSString(ConstantString(prop)), memory)
       } yield State(value, env, localStack, a, memory)
@@ -789,7 +815,7 @@ object AAM {
     case State(KBracketComplete(objRef, propRef), env, localStack, a, memory) =>
       for {
         obj <- memory.getValue(objRef)
-        if isObject(obj) //TODO
+        if canToObject(obj)
         o = ToObject(obj)
         prop <- memory.getValue(propRef)
         pstr = ToString(prop)
@@ -799,6 +825,7 @@ object AAM {
     case State(KLDotRefComplete(objRef, prop), env, localStack, a, memory) =>
       for {
         obj <- memory.getValue(objRef)
+        if canToObject(obj)
         objValue = ToObject(obj)
         values = objValue.lookupOwn(JSString(ConstantString(prop)))
       } yield {
@@ -815,6 +842,7 @@ object AAM {
     case State(KLBracketComplete(objRef, propRef), env, localStack, a, memory) =>
       for {
         obj <- memory.getValue(objRef)
+        if canToObject(obj)
         objValue = ToObject(obj)
         prop <- memory.getValue(propRef)
         pstr = ToString(prop)
@@ -832,6 +860,7 @@ object AAM {
       val newMemory = memory.copy(state)
       for {
         recs <- newMemory.getValue(receiver)
+        if canToObject(recs)
         rec = ToObject(recs)
         metName <- newMemory.getValue(method)
         if metName.isInstanceOf[JSString]
@@ -841,44 +870,54 @@ object AAM {
         JSClosure(func@FunctionExpr(name, ps, funcBody), savedEnv) = met.asInstanceOf[JSObject].code
 
       } yield {
-        val psAddress = ps.map(alloc(_))
-        //val thisAddress = alloc(func.thisID)
-        var newEnvPart = ("this" -> receiver.asInstanceOf[JSReference]) :: ps.map(x => x.str).zip(psAddress)
-        name match {
-          case Some(x) => newEnvPart = (x.str -> alloc(x)) :: newEnvPart
-          case None =>
+        if(isCallBuiltIn(met.asInstanceOf[JSObject])) {
+          methodBuiltInCall(rec, met.asInstanceOf[JSObject], args, state)
+        } else {
+          val psAddress = ps.map(alloc(_))
+          //val thisAddress = alloc(func.thisID)
+          var newEnvPart = ("this" -> receiver.asInstanceOf[JSReference]) :: ps.map(x => x.str).zip(psAddress)
+          name match {
+            case Some(x) => newEnvPart = (x.str -> alloc(x)) :: newEnvPart
+            case None =>
+          }
+          val newEnv = savedEnv ++ Map(newEnvPart: _*)
+          //putValue(thisAddress, rec)
+          psAddress.zip(args).foreach[Unit](
+            (p: (JSReference, JSValue)) => newMemory.getValue(p._2).foreach(newMemory.putValue(p._1, _)))
+          val nextAddress = allocStackAddress(state, funcBody, newEnv)
+          newMemory.pushGlobalStack(nextAddress, GlobalFrame(alloc(state.e), localStack, env, a))
+          State(funcBody, newEnv, emptyLocalStack, nextAddress, newMemory)
         }
-        val newEnv = savedEnv ++ Map(newEnvPart: _*)
-        //putValue(thisAddress, rec)
-        psAddress.zip(args).foreach[Unit](
-          (p: (JSReference, JSValue)) => newMemory.getValue(p._2).foreach(newMemory.putValue(p._1, _)))
-        val nextAddress = allocStackAddress(state, funcBody, newEnv)
-        newMemory.pushGlobalStack(nextAddress, GlobalFrame(alloc(state.e), localStack, env, a))
-        State(funcBody, newEnv, emptyLocalStack, nextAddress, newMemory)
       }
 
     case State(KFuncCallComplete(funcRef, args), env, localStack, a, memory) =>
       val newMemory = memory.copy(state)
       for {
-      //rec <- getValue(biGlobalObjectRef)
+        //rec <- memory.getValue(biGlobalObjectRef)
         f <- newMemory.getValue(funcRef)
         if isCallable(f)
         JSClosure(func@FunctionExpr(name, ps, funcBody), savedEnv) = f.asInstanceOf[JSObject].code
       } yield {
-        val psAddress = ps.map(alloc(_))
-        val thisAddress = biGlobalObjectRef
-        var newEnvPart = ("this" -> thisAddress) :: ps.map(x => x.str).zip(psAddress)
-        name match {
-          case Some(x) => newEnvPart = (x.str -> alloc(x)) :: newEnvPart
-          case None =>
+        if(isCallBuiltIn(f.asInstanceOf[JSObject])) {
+          funcBuiltInCall(f.asInstanceOf[JSObject], args, state)
+        } else {
+          val psAddress = ps.map(alloc(_))
+          val thisAddress = biGlobalObjectRef
+          var newEnvPart = ("this" -> thisAddress) :: ps.map(x => x.str).zip(psAddress)
+          name match {
+            case Some(x) => newEnvPart = (x.str -> alloc(x)) :: newEnvPart
+            case None =>
+          }
+          val newEnv = savedEnv ++ Map(newEnvPart: _*)
+          for(p <- psAddress.zip(args)) {
+            for(vs <- newMemory.getValue(p._2)) {
+              newMemory.putValue(p._1, vs)
+            }
+          }
+          val nextAddress = allocStackAddress(state, funcBody, newEnv)
+          newMemory.pushGlobalStack(nextAddress, GlobalFrame(alloc(state.e), localStack, env, a))
+          State(funcBody, newEnv, emptyLocalStack, nextAddress, newMemory)
         }
-        val newEnv = savedEnv ++ Map(newEnvPart: _*)
-
-        psAddress.zip(args).foreach[Unit]((p: (JSReference, JSValue)) =>
-          newMemory.getValue(p._2).foreach(newMemory.putValue(p._1, _)))
-        val nextAddress = allocStackAddress(state, funcBody, newEnv)
-        newMemory.pushGlobalStack(nextAddress, GlobalFrame(alloc(state.e), localStack, env, a))
-        State(funcBody, newEnv, emptyLocalStack, nextAddress, newMemory)
       }
 
     case State(kn@KNewCallComplete(constructor, args), env, localStack, a, memory) =>
@@ -886,6 +925,7 @@ object AAM {
       for {
         f <- newMemory.getValue(constructor)
         if isCallable(f)
+        if canToObject(f)
         cons = ToObject(f)
         prototype <- cons.lookup(JSString(ConstantString("prototype")), newMemory)
       } yield {
@@ -921,7 +961,9 @@ object AAM {
 
     case State(KAssignExprComplete(op, lv, rv), env, localStack, a, memory) =>
       val newMemory = memory.copy(state)
-      newMemory.getValue(rv).foreach((value: JSValue) => newMemory.putValue(lv.asInstanceOf[JSReference], value))
+      for(value <- newMemory.getValue(rv)) {
+        newMemory.putValue(lv.asInstanceOf[JSReference], value)
+      }
       Set(State(rv, env, localStack, a, newMemory))
 
     case State(ko@KObjectComplete(pairs), env, localStack, a, memory) =>
@@ -960,7 +1002,7 @@ object AAM {
       for {
         v <- newMemory.getValue(rv)
       } yield {
-        val res = prefixFunc(op, rv)
+        val res = prefixFunc(op, v)
         res.generateFrom(state.e)
         val newAddress = newMemory.save(res)
         State(newAddress, env, localStack, a, newMemory)
@@ -983,9 +1025,11 @@ object AAM {
     case State(KVarDeclStmtComplete(name, v), env, localStack, a, memory) =>
       val newMemory = memory.copy(state)
       val newAddress = alloc(name)
-      val newEnv = updateEnv(env, name.str, newAddress)
       newMemory.getValue(v).foreach((value: JSValue) => newMemory.putValue(newAddress, value))
-      Set(State(cachedUndefined, newEnv, localStack, a, newMemory))
+      Set(State(cachedUndefined, env, localStack, a, newMemory))
+
+
+
 
     case State(KFunctionDeclComplete(name, func), env, localStack, a, memory) =>
       val newMemory = memory.copy(state)
@@ -1047,61 +1091,5 @@ object AAM {
   def isJSValue(obj: Any): Boolean = obj.isInstanceOf[JSValue]
 
   def isFinalState(state: State) = state.e == Halt
-
-
-  def isRead(ast: AbstractSyntaxTree): Boolean = ast match {
-    //Statement
-    case EmptyStmt() => true
-
-    //Expressions
-    case EmptyExpr() => true
-    case _: FunctionExpr => true
-    case VarRef(_) => true
-    case ThisRef() => true
-    case NullLit() => true
-    case BoolLit(_) => true
-    case NumberLit(_) => true
-    case StringLit(_) => true
-    case _: RegExp => true
-
-    //LValue
-    case LVarRef(_) => true
-
-    //ForInInit
-    case _: ForInVarDecl => true
-    case _: ForInLValue => true
-
-    //Property
-    case _: Property => true
-
-    //Continuation
-    case _: KReturnComplete => true
-    case _: KIfComplete => true
-    case _: KWhileComplete => true
-    case _: KForInComplete => true
-    case _: KForComplete => true
-    case _: KForCompleteTrue => true
-
-    case _: KDotRefComplete => true
-    case _: KBracketComplete => true
-    case _: KMethodCallComplete => true
-    case _: KFuncCallComplete => true
-    case _: KNewCallComplete => true
-    case _: KAssignExprComplete => true
-    case _: KUnaryAssignComplete => true
-    case _: KPrefixExprComplete => true
-    case _: KInfixExprComplete => true
-    case KList(l :: Nil) => true
-    case _: KObjectComplete => true
-    //case _ : KObjectPairPack => true
-    case _: KArrayComplete => true
-    case _: KVarDeclStmtComplete => true
-    case _: KFunctionDeclComplete => true
-    case _: KLDotRefComplete => true
-    case _: KLBracketComplete => true
-
-    //otherwise
-    case _ => false
-  }
 
 }

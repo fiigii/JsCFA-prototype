@@ -412,13 +412,19 @@ object JSSemantics {
         case _: Throwable => JSNumber(JSNaN)
       }
     case o: JSObject => JSNumber(JSNaN) //ToPrimitive
-    case _ => throw new RuntimeException("Unknown value in ToNumber.")
+    case miss => throw new RuntimeException("Unknown value in ToNumber." + miss)
   }
 
   def ToObject(value : JSValue) : JSObject = value match {
     case _: JSReference => throw new RuntimeException("Reference :" + value +"cannot be converted to Object.")
     case obj : JSObject => obj
-    case _ => throw new RuntimeException("TODO ToObject with :" + value)
+    case _ => JSObject(collection.mutable.Map())//throw new RuntimeException("TODO ToObject with :" + value)
+  }
+
+  def canToObject(value : JSValue) : Boolean = value match {
+    case JSNull => false
+    case JSUndefined => false
+    case _ => true
   }
 
 
