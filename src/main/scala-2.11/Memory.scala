@@ -49,14 +49,14 @@ case class Memory(store : mutable.Map[JSReference, Set[JSValue]], stack : mutabl
 
 
   def getValue(a: JSValue): Set[JSValue] = a match {
-    case ref: JSReference => store(ref)
-      /*
+    case ref: JSReference => //store(ref)
+
     if(store.contains(ref)) {
       store(ref)
     } else {
       Set(JSUndefined)
     }
-    */
+
 
     case v => Set(v)
   }
@@ -80,11 +80,13 @@ case class Memory(store : mutable.Map[JSReference, Set[JSValue]], stack : mutabl
 
   def copy(state : State) : Memory ={
     startGC(state, this)
+    if(store.contains(JSReference(2022,2561)) && !markSet.contains(JSReference(2022,2561))) {
+      println("\n\n----->\n" + state + "\n")
+    }
     val newStore = store.filter {
       case (ref@JSReference(r, _), _) => markSet.contains(ref) || r < 0
     }
-
-
+    /*
     val copiedStore = newStore.map {
       case (ref, setValue) =>
         val newSet = setValue.map {
@@ -92,13 +94,15 @@ case class Memory(store : mutable.Map[JSReference, Set[JSValue]], stack : mutabl
           case other => other
         }
         ref -> newSet
-    }
+    } */
+
+    //if(newStore.contains(JSReference(2022,2561))) println("JSReference(2022,2561) at \n" + state + "\n\n")
 
     val newStack = stack.filter {
       case (ref, _) => markSetK.contains(ref)
     }
 
-    val newMemory = Memory(copiedStore, newStack)
+    val newMemory = Memory(newStore, newStack)
     newMemory
   }
 

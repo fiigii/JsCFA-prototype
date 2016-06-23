@@ -26,6 +26,7 @@ case class JSClosure(function: FunctionExpr, env : AAM.Environment)
 case class JSObject(content : scala.collection.mutable.Map[JSString, JSReference]) extends JSValue {
   var code : JSClosure = null
   var builtIn : JSReference = null
+  var primitiveValue : JSValue = null
   def lookup(field : JSString, memory: Memory) : Set[JSReference] = {
     val proto = JSString(ConstantString("__proto__"))
     if(content.contains(field)) {
@@ -51,12 +52,13 @@ case class JSObject(content : scala.collection.mutable.Map[JSString, JSReference
 
   def hasOwnProperty(prop : JSString) : Boolean = content.contains(prop)
 
-  def addField(prop : JSString, value : JSValue, obj : JSValue, memory: Memory): Unit = value match {
-    case ref : JSReference =>
-      ref.atObject = this.id
-      this.content += (prop -> ref)
-      mergeObject(obj, memory)
-    case _ => throw new RuntimeException("Cannot add non-reference value to object : " + value)
+  def addField(prop : JSString, objRef : JSValue, memory: Memory, state: State): JSReference = {
+    val ref = JSReference(state.e.id, this.id)
+    //ref.atObject = this.id
+    this.content += (prop -> ref)
+    //memory.store += (ref -> Set())
+    mergeObject(objRef, memory)
+    ref
   }
 
   def deleteField(prop: JSString, obj: JSValue, memory: Memory): Unit = prop match {

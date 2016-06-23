@@ -27,7 +27,7 @@ object JSSemantics {
     res
   }
 
-  def createArrayObject(ka: KArrayComplete,elements : List[JSValue], memory: Memory) : JSObject = {
+  def createArrayObject(ka: KArrayComplete, elements : List[JSValue], memory: Memory) : JSObject = {
     val els = collection.mutable.Map.empty[JSString, JSReference]
     var i = 0
     elements.foreach {
@@ -36,9 +36,18 @@ object JSSemantics {
         i += 1
       case wrong => throw new RuntimeException("Array Value :" + wrong + "is not Reference Based.")
     }
-    //els += JSString(ConstantString("length")) ->
+    els += JSString(ConstantString("length")) -> biArrayLengthRef
     val arrayObj = memory.createEmptyObject(biArrayProtoRef, biArrayRef, ka, els)
     arrayObj
+  }
+
+  def createStringObject(str: JSString) : JSObject = {
+    val sObj =  JSObject(collection.mutable.Map(
+      JSString(ConstantString("__proto__")) -> biStringProtoRef,
+      JSString(ConstantString("constructor")) -> biStringRef,
+      JSString(ConstantString("length")) -> biStringLength))
+    sObj.primitiveValue = str
+    sObj
   }
   def prefixFunc(op : PrefixOp, obj : JSValue) : JSValue = op match {
     case PrefixLNot => ToBoolean(obj) match {
@@ -209,6 +218,7 @@ object JSSemantics {
 
     case OpNEq => abstractEquality(e1, e2) match {
       case JSBoolean(ConstantBoolean(true)) => JSBoolean(ConstantBoolean(false))
+      case JSBoolean(ConstantBoolean(false)) => JSBoolean(ConstantBoolean(true))
       case JSBoolean(VariableBoolean) => JSBoolean(VariableBoolean)
     }
 
@@ -418,6 +428,7 @@ object JSSemantics {
   def ToObject(value : JSValue) : JSObject = value match {
     case _: JSReference => throw new RuntimeException("Reference :" + value +"cannot be converted to Object.")
     case obj : JSObject => obj
+    case str : JSString => createStringObject(str)
     case _ => JSObject(collection.mutable.Map())//throw new RuntimeException("TODO ToObject with :" + value)
   }
 
@@ -466,6 +477,8 @@ object JSSemantics {
     case o : JSObject =>
       if(isCallable(o)) {
         JSString(ConstantString(o.code.function.sourceCode))
+      } else if(o.primitiveValue != null) {
+        ToString(o.primitiveValue)
       } else {
         JSString(ConstantString("[object Object]"))
       }

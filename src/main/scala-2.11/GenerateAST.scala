@@ -257,7 +257,7 @@ object GenerateAST {
           ps += IntroduceVar(p.getString)
         }
         val funcExpr = FunctionExpr(funcName, ps.toList, convert_statement(theNode.getBody))
-        funcExpr.sourceCode = theNode.toSource
+        funcExpr.sourceCode = ""//theNode.toSource
         ret = funcExpr
       }
       case Token.CALL => {

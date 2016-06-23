@@ -5,7 +5,7 @@ import java.io.File
   */
 object Main {
   def main(args: Array[String]) {
-    val ast = GenerateAST(new File("benchmark/sunspider-3d-raytrace.js"))
+    val ast = GenerateAST(new File("benchmark/sunspider-access-binary-trees.js"))
     //val ast = GenerateAST(new File("test.js"))
     val decedAST = DecorateAST(ast)
     NameResolver(decedAST)

@@ -53,6 +53,7 @@ object AAMHelper {
     case _: KFunctionDeclComplete => true
     case _: KLDotRefComplete => true
     case _: KLBracketComplete => true
+    case _: KCondComplete => true
 
     //otherwise
     case _ => false

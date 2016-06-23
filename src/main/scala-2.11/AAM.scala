@@ -78,6 +78,8 @@ object AAM {
         println("    " + f)
       }
       */
+      //if(currentState.memory.store.contains((JSReference(2022,2561))))
+        //println("\n------------>")
       val nextStates = transitEvaluation(currentState)
 
       for (next <- nextStates) {
@@ -740,8 +742,8 @@ object AAM {
       Set(s)
 
     //Expressions
-    case State(VarRef(x), env, localStack, a, memory) =>
-      val xRef = lookup(env, x)
+    case State(v@VarRef(x), env, localStack, a, memory) =>
+      val xRef = lookup(env, v)
       val newMemory = memory.copy(state)
       for(vs <- newMemory.getValue(xRef)){
         newMemory.putValue(JSReference(state.e.id), vs)
@@ -751,9 +753,9 @@ object AAM {
     case State(ThisRef(), env, localStack, a, memory) =>
       val newMemory = memory.copy(state)
       val thisRef = lookup(env, "this")
-      //val newAddress = alloc(state.e)
-      //newMemory.getValue(thisRef).foreach(newMemory.putValue(newAddress, _))
-      Set(State(thisRef, env, localStack, a, newMemory))
+      val newAddress = alloc(state.e)
+      newMemory.getValue(thisRef).foreach(newMemory.putValue(newAddress, _))
+      Set(State(newAddress, env, localStack, a, newMemory))
 
     case State(f@FunctionExpr(name, ps, body), env, localStack, a, memory) =>
       val newMemory = memory.copy(state)
@@ -831,8 +833,7 @@ object AAM {
       } yield {
         if (values == cachedUndefined) {
           val newMemory = memory.copy(state)
-          val newAddress = alloc(state.e)
-          objValue.addField(JSString(ConstantString(prop)), newAddress, objRef, newMemory)
+          val newAddress = objValue.addField(JSString(ConstantString(prop)), objRef, newMemory, state)
           State(newAddress, env, localStack, a, newMemory)
         } else {
           State(values, env, localStack, a, memory)
@@ -849,23 +850,22 @@ object AAM {
         values = objValue.lookupOwn(pstr)
       } yield if (values == cachedUndefined) {
         val newMemory = memory.copy(state)
-        val newAddress = alloc(state.e)
-        objValue.addField(pstr, newAddress, objRef, newMemory)
+        val newAddress = objValue.addField(pstr, objRef, newMemory, state)
         State(newAddress, env, localStack, a, newMemory)
       } else {
         State(values, env, localStack, a, memory)
       }
 
     case State(KMethodCallComplete(receiver, method, args), env, localStack, a, memory) =>
-      val newMemory = memory.copy(state)
+
       for {
-        recs <- newMemory.getValue(receiver)
+        recs <- memory.getValue(receiver)
         if canToObject(recs)
         rec = ToObject(recs)
-        metName <- newMemory.getValue(method)
+        metName <- memory.getValue(method)
         if metName.isInstanceOf[JSString]
-        metRef <- rec.lookup(metName.asInstanceOf[JSString], newMemory)
-        met <- newMemory.getValue(metRef)
+        metRef <- rec.lookup(metName.asInstanceOf[JSString], memory)
+        met <- memory.getValue(metRef)
         if isCallable(met)
         JSClosure(func@FunctionExpr(name, ps, funcBody), savedEnv) = met.asInstanceOf[JSObject].code
 
@@ -882,6 +882,7 @@ object AAM {
           }
           val newEnv = savedEnv ++ Map(newEnvPart: _*)
           //putValue(thisAddress, rec)
+          val newMemory = memory.copy(state)
           psAddress.zip(args).foreach[Unit](
             (p: (JSReference, JSValue)) => newMemory.getValue(p._2).foreach(newMemory.putValue(p._1, _)))
           val nextAddress = allocStackAddress(state, funcBody, newEnv)
@@ -891,10 +892,10 @@ object AAM {
       }
 
     case State(KFuncCallComplete(funcRef, args), env, localStack, a, memory) =>
-      val newMemory = memory.copy(state)
+
       for {
         //rec <- memory.getValue(biGlobalObjectRef)
-        f <- newMemory.getValue(funcRef)
+        f <- memory.getValue(funcRef)
         if isCallable(f)
         JSClosure(func@FunctionExpr(name, ps, funcBody), savedEnv) = f.asInstanceOf[JSObject].code
       } yield {
@@ -909,6 +910,7 @@ object AAM {
             case None =>
           }
           val newEnv = savedEnv ++ Map(newEnvPart: _*)
+          val newMemory = memory.copy(state)
           for(p <- psAddress.zip(args)) {
             for(vs <- newMemory.getValue(p._2)) {
               newMemory.putValue(p._1, vs)
@@ -921,42 +923,48 @@ object AAM {
       }
 
     case State(kn@KNewCallComplete(constructor, args), env, localStack, a, memory) =>
-      val newMemory = memory.copy(state)
+
       for {
-        f <- newMemory.getValue(constructor)
+        f <- memory.getValue(constructor)
         if isCallable(f)
         if canToObject(f)
         cons = ToObject(f)
-        prototype <- cons.lookup(JSString(ConstantString("prototype")), newMemory)
+        prototype <- cons.lookup(JSString(ConstantString("prototype")), memory)
       } yield {
-        //create __proto__ object
-        val rec = newMemory.createEmptyObject(prototype, constructor.asInstanceOf[JSReference], kn)
-        rec.generateFrom(kn)
-        val JSClosure(FunctionExpr(name, ps, funcBody), savedEnv) = cons.code
-        //alloc parameters
-        val psAddress = ps.map(alloc(_))
+        if(isCallBuiltIn(f.asInstanceOf[JSObject])) {
+          newBuiltInCall(f.asInstanceOf[JSObject], args, state)
+        } else {
+          val newMemory = memory.copy(state)
+          //create __proto__ object
+          val rec = newMemory.createEmptyObject(prototype, constructor.asInstanceOf[JSReference], kn)
+          rec.generateFrom(kn)
+          val JSClosure(FunctionExpr(name, ps, funcBody), savedEnv) = cons.code
+          //alloc parameters
+          val psAddress = ps.map(alloc(_))
 
-        val thisAddress = alloc(kn)
+          val thisAddress = alloc(kn)
 
-        //update environment
-        var newEnvPart = ("this" -> thisAddress) :: ps.map(x => x.str).zip(psAddress)
-        name match {
-          case Some(x) => newEnvPart = (x.str -> alloc(x)) :: newEnvPart
-          case None =>
+          //update environment
+          var newEnvPart = ("this" -> thisAddress) :: ps.map(x => x.str).zip(psAddress)
+          name match {
+            case Some(x) => newEnvPart = (x.str -> alloc(x)) :: newEnvPart
+            case None =>
+          }
+          val newEnv = savedEnv ++ Map(newEnvPart: _*)
+
+          //pass arguments
+          newMemory.putValue(thisAddress, rec)
+          psAddress.zip(args).foreach[Unit]((p: (JSReference, JSValue)) => newMemory.getValue(p._2).foreach(newMemory.putValue(p._1, _)))
+
+          //return "this"
+          val newLocalStack = KUseValue(thisAddress) :: localStack
+
+          //push call stack
+          val nextAddress = allocStackAddress(state, funcBody, newEnv)
+          newMemory.pushGlobalStack(nextAddress, GlobalFrame(alloc(state.e), newLocalStack, env, a))
+          State(funcBody, newEnv, emptyLocalStack, nextAddress, newMemory)
         }
-        val newEnv = savedEnv ++ Map(newEnvPart: _*)
 
-        //pass arguments
-        newMemory.putValue(thisAddress, rec)
-        psAddress.zip(args).foreach[Unit]((p: (JSReference, JSValue)) => newMemory.getValue(p._2).foreach(newMemory.putValue(p._1, _)))
-
-        //return "this"
-        val newLocalStack = KUseValue(thisAddress) :: localStack
-
-        //push call stack
-        val nextAddress = allocStackAddress(state, funcBody, newEnv)
-        newMemory.pushGlobalStack(nextAddress, GlobalFrame(alloc(state.e), newLocalStack, env, a))
-        State(funcBody, newEnv, emptyLocalStack, nextAddress, newMemory)
       }
 
     case State(KAssignExprComplete(op, lv, rv), env, localStack, a, memory) =>
@@ -998,10 +1006,10 @@ object AAM {
       }
 
     case State(KPrefixExprComplete(op, rv), env, localStack, a, memory) =>
-      val newMemory = memory.copy(state)
       for {
-        v <- newMemory.getValue(rv)
+        v <- memory.getValue(rv)
       } yield {
+        val newMemory = memory.copy(state)
         val res = prefixFunc(op, v)
         res.generateFrom(state.e)
         val newAddress = newMemory.save(res)
@@ -1009,11 +1017,11 @@ object AAM {
       }
 
     case State(KInfixExprComplete(op, rv1, rv2), env, localStack, a, memory) =>
-      val newMemory = memory.copy(state)
       for {
-        v1 <- newMemory.getValue(rv1)
-        v2 <- newMemory.getValue(rv2)
+        v1 <- memory.getValue(rv1)
+        v2 <- memory.getValue(rv2)
       } yield {
+        val newMemory = memory.copy(state)
         val res = infixFunc(op, v1, v2, newMemory)
         res.generateFrom(state.e)
         val address = newMemory.save(res)
@@ -1041,11 +1049,11 @@ object AAM {
     //case State(KObjectPairComplete())
 
     case State(KForInComplete(init, expr, body), env, localStack, a, memory) =>
-      val newMemory = memory.copy(state)
       for {
-        value <- newMemory.getValue(expr)
+        value <- memory.getValue(expr)
         if init.isInstanceOf[JSReference]
       } yield {
+        val newMemory = memory.copy(state)
         val keys = ToObject(value).keys(newMemory)
         newMemory.putSetValue(init.asInstanceOf[JSReference], keys.toSet)
         State(body, env, localStack, a, newMemory)
@@ -1085,6 +1093,11 @@ object AAM {
 
   def lookup(env: Environment, name: String): JSReference = env.get(name) match {
     case None => throw new UnDecledVar(name)
+    case Some(v) => v
+  }
+
+  def lookup(env: Environment, variable: VarRef): JSReference = env.get(variable.name) match {
+    case None => throw new UnDecledVar(variable.name)
     case Some(v) => v
   }
 
