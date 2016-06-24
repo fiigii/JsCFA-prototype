@@ -2,9 +2,10 @@
   * Created by Fei Peng on 5/21/16.
   */
 import scala.collection.mutable
-import AAM.{GlobalFrame, StackAddress, disk, alloc, State}
+import AAM.{GlobalFrame, StackAddress, State, alloc, disk}
 import JSBuiltIn.biObjectRef
-import GarbageCollector.{startGC, markSet, markSetK}
+import GarbageCollector.{markSet, markSetK, startGC}
+import JSSemantics._
 
 case class Memory(store : mutable.Map[JSReference, Set[JSValue]], stack : mutable.Map[StackAddress, Set[GlobalFrame]]) {
 
@@ -21,12 +22,14 @@ case class Memory(store : mutable.Map[JSReference, Set[JSValue]], stack : mutabl
     if (v.isInstanceOf[JSReference]) throw new RuntimeException("Cannot store a Reference.")
     if (store.contains(a)) {
       store(a) = mergeSet(store(a), v)
+      mergeObject(a)
     } else {
       store += (a -> Set(v))
     }
 
     if (disk.contains(a)) {
       disk(a) = mergeSet(disk(a), v)
+      mergeObjectInDisk(a)
     } else {
       disk += (a -> Set(v))
     }
@@ -66,7 +69,7 @@ case class Memory(store : mutable.Map[JSReference, Set[JSValue]], stack : mutabl
   def pushGlobalStack(a: StackAddress, frame: GlobalFrame): Unit = {
     /*
     if(a == frame.a) {
-      println("loop")
+      //println("loop")
       return
     } //detected loop
     */
@@ -80,9 +83,6 @@ case class Memory(store : mutable.Map[JSReference, Set[JSValue]], stack : mutabl
 
   def copy(state : State) : Memory ={
     startGC(state, this)
-    if(store.contains(JSReference(2022,2561)) && !markSet.contains(JSReference(2022,2561))) {
-      println("\n\n----->\n" + state + "\n")
-    }
     val newStore = store.filter {
       case (ref@JSReference(r, _), _) => markSet.contains(ref) || r < 0
     }
@@ -145,6 +145,18 @@ case class Memory(store : mutable.Map[JSReference, Set[JSValue]], stack : mutabl
 
         case _ => oldSet + newValue
       }
+    }
+  }
+
+  def mergeObject(ref: JSReference): Unit = {
+    if (store.contains(ref) && store(ref).count(isObject(_)) > 1) {
+      store(ref) = store(ref).toList.toSet
+    }
+  }
+
+  def mergeObjectInDisk(ref: JSReference): Unit = {
+    if (disk.contains(ref) && disk(ref).count(isObject(_)) > 1) {
+      disk(ref) = disk(ref).toList.toSet
     }
   }
 

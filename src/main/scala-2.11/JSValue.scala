@@ -19,7 +19,7 @@ case class JSNumber(number : AbstractNumber) extends JSValue
 case class JSBoolean(bool : AbstractBoolean) extends JSValue
 case class JSString(str : AbstractString) extends JSValue
 
-case class KObjectPairPack(name : JSString, v : JSValue) extends JSValue {}
+case class KObjectPairPack(name : JSString, v : JSValue) extends JSValue
 
 case class JSClosure(function: FunctionExpr, env : AAM.Environment)
 
@@ -54,17 +54,15 @@ case class JSObject(content : scala.collection.mutable.Map[JSString, JSReference
 
   def addField(prop : JSString, objRef : JSValue, memory: Memory, state: State): JSReference = {
     val ref = JSReference(state.e.id, this.id)
-    //ref.atObject = this.id
     this.content += (prop -> ref)
-    //memory.store += (ref -> Set())
-    mergeObject(objRef, memory)
+    //mergeObject(objRef, memory)
     ref
   }
 
   def deleteField(prop: JSString, obj: JSValue, memory: Memory): Unit = prop match {
     case JSString(ConstantString(_)) =>
       this.content -= prop
-      mergeObject(obj, memory)
+      //mergeObject(obj, memory)
     case _ =>
   }
 
@@ -78,7 +76,6 @@ case class JSObject(content : scala.collection.mutable.Map[JSString, JSReference
     if(proto == JSBuiltIn.cachedUndefined || memory.getValue(proto).contains(JSNull)) {
       ownKeys.toList
     } else {
-      //println("\n\nproto : " + proto + "\n\n")
       val tmp = for {
         theProto <- memory.getValue(proto)
         if theProto != JSNull
@@ -87,7 +84,7 @@ case class JSObject(content : scala.collection.mutable.Map[JSString, JSReference
       ownKeys.toList ++ tmp
     }
   }
-
+  /*
   def copy : JSObject = {
     val obj = JSObject(this.content)
     obj.code = this.code
@@ -95,12 +92,9 @@ case class JSObject(content : scala.collection.mutable.Map[JSString, JSReference
     if(this.hasID)obj.generateFrom(this)
     obj
   }
+  */
 
-  private def mergeObject(v: JSValue, memory: Memory): Unit = v match {
-    case ref: JSReference if memory.store.contains(ref) && memory.store(ref).count(isObject(_)) > 1 =>
-      memory.store(ref) = memory.store(ref).toList.toSet
-    case _ =>
-  }
+
 
   override def toString = {
     if(code != null) {

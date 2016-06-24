@@ -1,6 +1,20 @@
-var a = new Array(1)
-var b = new Array(1,2)
-var c = new Object()
 
-var d = Array(1,2,3,4,5)
-var e = Object()
+function fib(n) {
+	if(n < 3) return 1;
+	else return fib(n - 1) + fib(n - 2);
+}
+
+var a = fib(10)
+//var b = fib(122)
+
+var b = a + 1 * 19
+
+/*
+function tak(x,y,z) {
+	if (y >= x) return z;
+	return tak(tak(x-1,y,z), tak(y-1,z,x), tak(z-1,x,y));
+}
+
+var a = tak(12,2,1)
+var b = tak(32,16,5)
+*/

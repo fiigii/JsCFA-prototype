@@ -1,3 +1,5 @@
+import java.io.{File, FileWriter}
+
 import JSSemantics._
 
 /**
@@ -61,6 +63,9 @@ object AAM {
     val seen = scala.collection.mutable.Set.empty[State]
     seen.add(initState)
 
+    val nodeSet = collection.mutable.Set.empty[String]
+    val edgeSet = collection.mutable.Set.empty[String]
+
 
     var i = 0
 
@@ -78,19 +83,26 @@ object AAM {
         println("    " + f)
       }
       */
-      //if(currentState.memory.store.contains((JSReference(2022,2561))))
-        //println("\n------------>")
+      val node = currentState.hashCode() + "[label = \"\", style = filled, fillcolor = gray];\n"
+      nodeSet += node
       val nextStates = transitEvaluation(currentState)
-
+      for (next <- nextStates) {
+        val edge = currentState.hashCode() + " -> " + next.hashCode() + ";\n"
+        edgeSet += edge
+      }
       for (next <- nextStates) {
         if (!seen.contains(next)) {
           seen.add(next)
           todo = next :: todo
-        } else {
+        } //else {
           //println("\n\nSEEN: " + next)
-        }
+        //}
       }
     }
+    val graph = "digraph BST {\n" + nodeSet.mkString + edgeSet.mkString + "}"
+    val writer = new FileWriter(new File("graph.gv"))
+    writer.write(graph)
+    writer.close()
     println("TOTAL : " + i)
     disk
   }
