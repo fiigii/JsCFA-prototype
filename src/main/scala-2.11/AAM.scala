@@ -1,3 +1,5 @@
+import java.io.{File, FileWriter}
+
 import JSSemantics._
 
 /**
@@ -51,6 +53,8 @@ object AAM {
   private val emptyEnv = builtInEnv
   private val emptyLocalStack = Nil
 
+  var missCount = 0
+
   val initMemory = setBuiltIn()
 
   val disk: Disk = scala.collection.mutable.Map.empty[JSReference, AbstractValue]
@@ -60,6 +64,9 @@ object AAM {
     var todo = List(initState)
     val seen = scala.collection.mutable.Set.empty[State]
     seen.add(initState)
+
+    //val nodeSet = collection.mutable.Set.empty[String]
+    //val edgeSet = collection.mutable.Set.empty[String]
 
 
     var i = 0
@@ -78,19 +85,26 @@ object AAM {
         println("    " + f)
       }
       */
-      //if(currentState.memory.store.contains((JSReference(2022,2561))))
-        //println("\n------------>")
+      //val node = currentState.hashCode() + "[label = \"\", style = filled, fillcolor = gray];\n"
+      //nodeSet += node
       val nextStates = transitEvaluation(currentState)
-
+      //for (next <- nextStates) {
+        //val edge = currentState.hashCode() + " -> " + next.hashCode() + ";\n"
+        //edgeSet += edge
+      //}
       for (next <- nextStates) {
         if (!seen.contains(next)) {
           seen.add(next)
           todo = next :: todo
-        } else {
+        } //else {
           //println("\n\nSEEN: " + next)
-        }
+        //}
       }
     }
+    //val graph = "digraph BST {\n" + nodeSet.mkString + edgeSet.mkString + "}"
+    //val writer = new FileWriter(new File("graph.gv"))
+    //writer.write(graph)
+    //writer.close()
     println("TOTAL : " + i)
     disk
   }
@@ -314,7 +328,7 @@ object AAM {
         transitContinuation(cont, v.asInstanceOf[JSValue], env, newStack, a, memory)
       } else if (a != startAddress) {
         for {
-          GlobalFrame(returnPoint, oldStack, savedEnv, newGlobalAddress) <- memory.globalFrames(a)
+          GlobalFrame(returnPoint, oldStack, savedEnv, newGlobalAddress) <- memory.getFrames(a)
         } yield {
           if(oldStack.isEmpty || !oldStack.head.isInstanceOf[KUseValue]) {
             val newMemory = memory.copy(state)
@@ -611,7 +625,10 @@ object AAM {
       Set(State(k, env, localStack, a, memory))
 
     //Special
-    case KUseValue(v) => Set(State(v, env, localStack, a, memory))
+    case KUseValue(v) =>
+      //memory.mergeObject(v.asInstanceOf[JSReference])
+      //memory.mergeObjectInDisk(v.asInstanceOf[JSReference])
+      Set(State(v, env, localStack, a, memory))
 
     case complete if isComplete(complete) => transitApplication(State(complete, env, localStack, a, memory))
 
@@ -621,10 +638,16 @@ object AAM {
   def transitApplication(state: State): Set[State] = state match {
     //Statements
     case State(EmptyStmt(), env, localStack, a, memory) =>
-      val newMemory = memory.copy(state)
-      val newAddress = alloc(state.e)
-      newMemory.putValue(newAddress, JSUndefined)
-      Set(State(newAddress, env, localStack, a, newMemory))
+      //val newMemory = memory.copy(state)
+      //val newAddress = alloc(state.e)
+      //newMemory.putValue(newAddress, JSUndefined)
+      Set(State(cachedUndefined, env, localStack, a, memory))
+
+    case State(ContinueStmt(_), env, localStack, a, memory) =>
+      Set(State(cachedUndefined, env, localStack, a, memory))
+
+    case State(BreakStmt(_), env, localStack, a, memory) =>
+      Set(State(cachedUndefined, env, localStack, a, memory))
 
     case State(EmptyExpr(), env, localStack, a, memory) =>
       val newMemory = memory.copy(state)
@@ -635,7 +658,7 @@ object AAM {
     case State(KReturnComplete(v), env, localStack, a, memory) =>
       val newMemory = memory.copy(state)
       for {
-        GlobalFrame(returnPoint, oldStack, savedEnv, newGlobalAddress) <- newMemory.globalFrames(a)
+        GlobalFrame(returnPoint, oldStack, savedEnv, newGlobalAddress) <- newMemory.getFrames(a)
       } yield {
         if(oldStack.isEmpty || !oldStack.head.isInstanceOf[KUseValue]) {
           for(vs <- newMemory.getValue(v)) {
@@ -811,8 +834,18 @@ object AAM {
         obj <- memory.getValue(objRef)
         if canToObject(obj)
         o = ToObject(obj)
-        value <- o.lookup(JSString(ConstantString(prop)), memory)
-      } yield State(value, env, localStack, a, memory)
+      } yield {
+        o.lookup(JSString(ConstantString(prop)), memory) match {
+          case None => State(cachedUndefined, env, localStack, a, memory)
+          case Some(values) =>
+            val newMemory = memory.copy(state)
+            val newAddress = alloc(state.e)
+            for(v <- values) {
+              newMemory.putValue(newAddress, v)
+            }
+            State(newAddress, env, localStack, a, newMemory)
+        }
+      }
 
     case State(KBracketComplete(objRef, propRef), env, localStack, a, memory) =>
       for {
@@ -821,22 +854,33 @@ object AAM {
         o = ToObject(obj)
         prop <- memory.getValue(propRef)
         pstr = ToString(prop)
-        value <- o.lookup(pstr, memory)
-      } yield State(value, env, localStack, a, memory)
+      } yield {
+        o.lookup(pstr, memory) match {
+          case None => State(cachedUndefined, env, localStack, a, memory)
+          case Some(values) =>
+            val newMemory = memory.copy(state)
+            val newAddress = alloc(state.e)
+            for(v <- values) {
+              newMemory.putValue(newAddress, v)
+            }
+            State(newAddress, env, localStack, a, newMemory)
+        }
+      }
 
     case State(KLDotRefComplete(objRef, prop), env, localStack, a, memory) =>
       for {
         obj <- memory.getValue(objRef)
         if canToObject(obj)
         objValue = ToObject(obj)
-        values = objValue.lookupOwn(JSString(ConstantString(prop)))
       } yield {
-        if (values == cachedUndefined) {
-          val newMemory = memory.copy(state)
-          val newAddress = objValue.addField(JSString(ConstantString(prop)), objRef, newMemory, state)
-          State(newAddress, env, localStack, a, newMemory)
-        } else {
-          State(values, env, localStack, a, memory)
+        val newMemory = memory.copy(state)
+        val values = objValue.lookupOwn(JSString(ConstantString(prop)), newMemory)
+        values match {
+          case None =>
+            val newAddress = objValue.addField(JSString(ConstantString(prop)), objRef, newMemory, state)
+            State(newAddress, env, localStack, a, newMemory)
+          case Some(ref) =>
+            State(ref, env, localStack, a, newMemory)
         }
       }
 
@@ -847,13 +891,17 @@ object AAM {
         objValue = ToObject(obj)
         prop <- memory.getValue(propRef)
         pstr = ToString(prop)
-        values = objValue.lookupOwn(pstr)
-      } yield if (values == cachedUndefined) {
+
+      } yield {
         val newMemory = memory.copy(state)
-        val newAddress = objValue.addField(pstr, objRef, newMemory, state)
-        State(newAddress, env, localStack, a, newMemory)
-      } else {
-        State(values, env, localStack, a, memory)
+        val values = objValue.lookupOwn(pstr, newMemory)
+        values match {
+          case None =>
+            val newAddress = objValue.addField(pstr, objRef, newMemory, state)
+            State(newAddress, env, localStack, a, newMemory)
+          case Some(ref) =>
+            State(ref, env, localStack, a, newMemory)
+        }
       }
 
     case State(KMethodCallComplete(receiver, method, args), env, localStack, a, memory) =>
@@ -862,14 +910,17 @@ object AAM {
         recs <- memory.getValue(receiver)
         if canToObject(recs)
         rec = ToObject(recs)
-        metName <- memory.getValue(method)
-        if metName.isInstanceOf[JSString]
-        metRef <- rec.lookup(metName.asInstanceOf[JSString], memory)
-        met <- memory.getValue(metRef)
+        metObj <- memory.getValue(method)
+        metName = ToString(metObj)
+        opMets = rec.lookup(metName, memory)
+        ms = opMets.getOrElse(Set())
+        met <- ms
+        //met <- memory.getValue(metRef)
         if isCallable(met)
         JSClosure(func@FunctionExpr(name, ps, funcBody), savedEnv) = met.asInstanceOf[JSObject].code
 
       } yield {
+
         if(isCallBuiltIn(met.asInstanceOf[JSObject])) {
           methodBuiltInCall(rec, met.asInstanceOf[JSObject], args, state)
         } else {
@@ -886,7 +937,7 @@ object AAM {
           psAddress.zip(args).foreach[Unit](
             (p: (JSReference, JSValue)) => newMemory.getValue(p._2).foreach(newMemory.putValue(p._1, _)))
           val nextAddress = allocStackAddress(state, funcBody, newEnv)
-          newMemory.pushGlobalStack(nextAddress, GlobalFrame(alloc(state.e), localStack, env, a))
+          newMemory.pushFrame(nextAddress, GlobalFrame(alloc(state.e), localStack, env, a))
           State(funcBody, newEnv, emptyLocalStack, nextAddress, newMemory)
         }
       }
@@ -917,7 +968,7 @@ object AAM {
             }
           }
           val nextAddress = allocStackAddress(state, funcBody, newEnv)
-          newMemory.pushGlobalStack(nextAddress, GlobalFrame(alloc(state.e), localStack, env, a))
+          newMemory.pushFrame(nextAddress, GlobalFrame(alloc(state.e), localStack, env, a))
           State(funcBody, newEnv, emptyLocalStack, nextAddress, newMemory)
         }
       }
@@ -961,7 +1012,7 @@ object AAM {
 
           //push call stack
           val nextAddress = allocStackAddress(state, funcBody, newEnv)
-          newMemory.pushGlobalStack(nextAddress, GlobalFrame(alloc(state.e), newLocalStack, env, a))
+          newMemory.pushFrame(nextAddress, GlobalFrame(alloc(state.e), newLocalStack, env, a))
           State(funcBody, newEnv, emptyLocalStack, nextAddress, newMemory)
         }
 
@@ -980,7 +1031,7 @@ object AAM {
         case (name, v: JSReference) => (name, v)
         case wrong => throw new RuntimeException("Object Value :" + wrong + "is not Reference Based.")
       }
-      val obj = newMemory.createEmptyObject(biObjectProtoRef, biObjectRef,ko,
+      val obj = newMemory.createEmptyObjectP(biObjectProtoRef, biObjectRef,ko,
         collection.mutable.Map(content.toSeq: _*))
       obj.generateFrom(state.e)
       val objRef = newMemory.save(obj)

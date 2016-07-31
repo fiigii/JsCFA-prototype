@@ -16,8 +16,8 @@ object GarbageCollector {
     traceFrom(root, memory)
     //sweep(memory)
 
-    val stackRoot = state.a
-    traceStack(stackRoot, memory)
+    //val stackRoot = state.a
+    //traceStack(stackRoot, memory)
     //sweepStack(memory)
   }
 
@@ -25,18 +25,36 @@ object GarbageCollector {
     markSet.clear()
     markSetK.clear()
     markSetK.add(startAddress)
-    seenFrame.clear()
-    seenFrame.add(startFrame)
+    //seenFrame.clear()
+    //seenFrame.add(startFrame)
   }
+
 
   def rootSet(state: State, memory: Memory) : Set[JSReference] = state match {
     case State(e, env, lstack, a, _) =>
       val currSet = rootSet(e) ++ rootSet(env) ++ rootSet(lstack)
-      val globalSet = memory.stack(a).flatMap(rootSet(_, memory))
+      val globalSet = rootSet(a, memory)//memory.stack(a).flatMap(rootSet(_, memory))
       val root = currSet ++ globalSet
       root
   }
 
+
+  def rootSet(ak: StackAddress, memory: Memory) : Set[JSReference] ={
+    if(!markSetK.contains(ak)) {
+      markSetK.add(ak)
+      memory.stack(ak).flatMap {
+          case GlobalFrame(returnPoint, oldStack, oldEnv, a)  =>
+            if (a == startAddress) {
+              rootSet(returnPoint) ++ rootSet(oldEnv) ++ rootSet(oldStack)
+            } else {
+              rootSet(returnPoint) ++ rootSet(oldEnv) ++ rootSet(oldStack) ++ rootSet(a, memory)
+            }
+      }
+    } else {
+      Set()
+    }
+  }
+  /*
   def rootSet(frame: GlobalFrame, memory: Memory) : Set[JSReference] ={
     if(!seenFrame.contains(frame)) {
       seenFrame.add(frame)
@@ -49,7 +67,9 @@ object GarbageCollector {
           }
       }
     } else Set()
-  }
+  } */
+
+
 
   def rootSet(lstack: LocalStack) : Set[JSReference] = lstack match {
     case Nil => Set()
@@ -116,11 +136,11 @@ object GarbageCollector {
   }
 
   def trace(ref : JSReference, memory: Memory): Unit ={
-    if(!ref.isBuiltIn && memory.store.contains(ref) && !markSet.contains(ref)) {
+    if(memory.store.contains(ref) && !markSet.contains(ref)) {
       markSet.add(ref)
 
       memory.getValue(ref).foreach {
-        case obj@JSObject(content) =>
+        case obj@JSObject(content, _) =>
           content.foreach {
             case (name, value) =>
               trace(value, memory)

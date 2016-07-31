@@ -2,9 +2,11 @@
   * Created by Fei Peng on 5/21/16.
   */
 import scala.collection.mutable
-import AAM.{GlobalFrame, StackAddress, disk, alloc, State}
-import JSBuiltIn.biObjectRef
-import GarbageCollector.{startGC, markSet, markSetK}
+import AAM.{GlobalFrame, StackAddress, State, alloc, disk}
+import JSBuiltIn.{biObjectRef, biObjectProtoRef}
+import GarbageCollector.{markSet, markSetK, startGC}
+import JSSemantics._
+import AAM.missCount
 
 case class Memory(store : mutable.Map[JSReference, Set[JSValue]], stack : mutable.Map[StackAddress, Set[GlobalFrame]]) {
 
@@ -21,12 +23,14 @@ case class Memory(store : mutable.Map[JSReference, Set[JSValue]], stack : mutabl
     if (v.isInstanceOf[JSReference]) throw new RuntimeException("Cannot store a Reference.")
     if (store.contains(a)) {
       store(a) = mergeSet(store(a), v)
+      mergeObject(a)
     } else {
       store += (a -> Set(v))
     }
 
     if (disk.contains(a)) {
       disk(a) = mergeSet(disk(a), v)
+      mergeObjectInDisk(a)
     } else {
       disk += (a -> Set(v))
     }
@@ -50,26 +54,31 @@ case class Memory(store : mutable.Map[JSReference, Set[JSValue]], stack : mutabl
 
   def getValue(a: JSValue): Set[JSValue] = a match {
     case ref: JSReference => //store(ref)
-
-    if(store.contains(ref)) {
-      store(ref)
-    } else {
-      Set(JSUndefined)
-    }
-
+      if(store.contains(ref)) {
+        store(ref)
+      } else {
+        Set(JSUndefined)
+      }
 
     case v => Set(v)
   }
 
-  def globalFrames(a: StackAddress): Set[GlobalFrame] = stack(a)
-
-  def pushGlobalStack(a: StackAddress, frame: GlobalFrame): Unit = {
+  def getFrames(a: StackAddress) : Set[GlobalFrame] = {
     /*
-    if(a == frame.a) {
-      println("loop")
-      return
-    } //detected loop
+    val frames = stack(a)
+    val points = frames.map {
+      case GlobalFrame(r, _, _, _) => r
+    }
+    if(points.size > 1) missCount += 1
+    frames
     */
+    stack(a)
+  }
+
+  def pushFrame(a: StackAddress, frame: GlobalFrame): Unit = {
+
+    if(a == frame.a && stack.contains(a)) return
+
     if (stack.contains(a)) {
       stack(a) += frame
     } else {
@@ -80,9 +89,6 @@ case class Memory(store : mutable.Map[JSReference, Set[JSValue]], stack : mutabl
 
   def copy(state : State) : Memory ={
     startGC(state, this)
-    if(store.contains(JSReference(2022,2561)) && !markSet.contains(JSReference(2022,2561))) {
-      println("\n\n----->\n" + state + "\n")
-    }
     val newStore = store.filter {
       case (ref@JSReference(r, _), _) => markSet.contains(ref) || r < 0
     }
@@ -106,7 +112,27 @@ case class Memory(store : mutable.Map[JSReference, Set[JSValue]], stack : mutabl
     newMemory
   }
 
-  def createEmptyObject(proto : JSReference, constr : JSReference, point : ObjectGeneratePoint = null, content : mutable.Map[JSString, JSReference] = mutable.Map.empty[JSString, JSReference]) : JSObject = {
+  def createEmptyObject(proto : Set[JSValue], constr : JSReference, point : ObjectGeneratePoint = null, content : mutable.Map[JSString, JSReference] = mutable.Map.empty[JSString, JSReference]) : JSObject = {
+    val biObjectPrototype = JSObject(content)
+    if(point != null) {
+      val protoAddr = alloc(point.protoID)
+      for(v <- proto) {
+        putValue(protoAddr, v)
+      }
+      biObjectPrototype.content += (JSString(ConstantString("__proto__")) -> protoAddr)
+      val consAddr = alloc(point.constructorID)
+      for(v <- getValue(constr)) {
+        putValue(consAddr, v)
+      }
+      biObjectPrototype.content += (JSString(ConstantString("constructor")) -> consAddr)
+    } else {
+      biObjectPrototype.content += (JSString(ConstantString("__proto__")) -> biObjectProtoRef)
+      biObjectPrototype.content += (JSString(ConstantString("constructor")) -> biObjectRef)
+    }
+    biObjectPrototype
+  }
+
+  def createEmptyObjectP(proto : JSReference, constr : JSReference, point : ObjectGeneratePoint = null, content : mutable.Map[JSString, JSReference] = mutable.Map.empty[JSString, JSReference]) : JSObject = {
     val biObjectPrototype = JSObject(content)
     if(point != null) {
       val protoAddr = alloc(point.protoID)
@@ -142,9 +168,21 @@ case class Memory(store : mutable.Map[JSReference, Set[JSValue]], stack : mutabl
         case JSString(_) if oldSet.exists(_.isInstanceOf[JSString]) =>
           val noStrSet = oldSet.filterNot(_.isInstanceOf[JSString])
           noStrSet + JSString(VariableString)
-
+        //case JSObject(_,_) =>
         case _ => oldSet + newValue
       }
+    }
+  }
+
+  def mergeObject(ref: JSReference): Unit = {
+    if (store.contains(ref) && store(ref).count(isObject(_)) > 1) {
+      store(ref) = store(ref).toList.toSet
+    }
+  }
+
+  def mergeObjectInDisk(ref: JSReference): Unit = {
+    if (disk.contains(ref) && disk(ref).count(isObject(_)) > 1) {
+      disk(ref) = disk(ref).toList.toSet
     }
   }
 

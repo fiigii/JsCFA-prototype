@@ -6,6 +6,8 @@ object AAMHelper {
   def isComplete(ast: AbstractSyntaxTree): Boolean = ast match {
     //Statement
     case EmptyStmt() => true
+    case ContinueStmt(_) => true
+    case BreakStmt(_) => true
 
     //Expressions
     case EmptyExpr() => true

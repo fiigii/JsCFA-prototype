@@ -1,0 +1,15 @@
+ls
+run
+help
+mem
+-mem
+run
+run > tmp.txt
+run
+run -Dsbt.task.timings=true
+run
+run -oD
+run
+run -optimize
+run
+run -oD

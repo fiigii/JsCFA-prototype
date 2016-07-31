@@ -1,6 +1,8 @@
-var a = new Array(1)
-var b = new Array(1,2)
-var c = new Object()
+function f(x) {
+    if(x > 0) {
+        return function(y) {return x * y};
+    } else {
+        return function(z) {return z - x};
+    }
+}
 
-var d = Array(1,2,3,4,5)
-var e = Object()

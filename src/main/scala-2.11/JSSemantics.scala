@@ -9,8 +9,8 @@ object JSSemantics {
   import AAM._
   import JSBuiltIn._
   def createFunctionObject(func : FunctionExpr, env : Environment, memory: Memory) : JSObject = {
-    val res = memory.createEmptyObject(biFunctionProtoRef, biFunctionRef, func)
-    val prototype = memory.createEmptyObject(biObjectProtoRef, alloc(func))
+    val res = memory.createEmptyObjectP(biFunctionProtoRef, biFunctionRef, func)
+    val prototype = memory.createEmptyObjectP(biObjectProtoRef, alloc(func))
     if(func.prototypeID < 0) throw new RuntimeException("Invalid Prototype ID in: " + func)
     prototype.id = func.prototypeID
     val prototypeAddress = alloc(prototype.id)
@@ -22,7 +22,7 @@ object JSSemantics {
   }
 
   def createRegExpObject(regexp : RegExp, memory: Memory) : JSObject = {
-    val res = memory.createEmptyObject(biRegExpProtoRef, biRegExpRef)
+    val res = memory.createEmptyObjectP(biRegExpProtoRef, biRegExpRef)
     res.generateFrom(regexp)
     res
   }
@@ -37,7 +37,7 @@ object JSSemantics {
       case wrong => throw new RuntimeException("Array Value :" + wrong + "is not Reference Based.")
     }
     els += JSString(ConstantString("length")) -> biArrayLengthRef
-    val arrayObj = memory.createEmptyObject(biArrayProtoRef, biArrayRef, ka, els)
+    val arrayObj = memory.createEmptyObjectP(biArrayProtoRef, biArrayRef, ka, els)
     arrayObj
   }
 
@@ -47,7 +47,20 @@ object JSSemantics {
       JSString(ConstantString("constructor")) -> biStringRef,
       JSString(ConstantString("length")) -> biStringLength))
     sObj.primitiveValue = str
+    sObj.id = str.id
     sObj
+  }
+
+  def createNumberObject(num: JSNumber) : JSObject = {
+    val content = collection.mutable.Map[JSString, JSReference](
+      JSString(ConstantString("__proto__")) -> biNumberProtoRef,
+      JSString(ConstantString("constructor")) -> biNumberRef
+    )
+
+    val nObj = JSObject(content)
+    nObj.primitiveValue = num
+    nObj.id = num.id
+    nObj
   }
   def prefixFunc(op : PrefixOp, obj : JSValue) : JSValue = op match {
     case PrefixLNot => ToBoolean(obj) match {
@@ -83,7 +96,8 @@ object JSSemantics {
   }
 
   def infixFunc(op : InfixOp, e1 : JSValue, e2 : JSValue, memory: Memory) : JSValue = op match {
-    case OpLT =>
+    case OpLT =>  JSBoolean(VariableBoolean)
+      /*
       val p1 = ToPrimitive(e1)
       val p2 = ToPrimitive(e2)
       if(isString(p1) && isString(p2)) {
@@ -111,9 +125,11 @@ object JSSemantics {
             case _ => throw new RuntimeException("Cannot Reach this point.")
           }
         }
-      }
+      }*/
 
     case OpLEq =>
+      JSBoolean(VariableBoolean)
+      /*
       val p1 = ToPrimitive(e1)
       val p2 = ToPrimitive(e2)
       if(isString(p1) && isString(p2)) {
@@ -141,9 +157,11 @@ object JSSemantics {
             case _ => throw new RuntimeException("Cannot Reach this point.")
           }
         }
-      }
+      }  */
 
     case OpGT =>
+      JSBoolean(VariableBoolean)
+      /*
       val p1 = ToPrimitive(e1)
       val p2 = ToPrimitive(e2)
       if(isString(p1) && isString(p2)) {
@@ -171,7 +189,7 @@ object JSSemantics {
             case _ => throw new RuntimeException("Cannot Reach this point.")
           }
         }
-      }
+      } */
 
     case OpGEq => JSBoolean(VariableBoolean)/*
       val p1 = ToPrimitive(e1)
@@ -200,9 +218,10 @@ object JSSemantics {
             case _ => throw new RuntimeException("Cannot Reach this point.")
           }
         }
-      }  */
+      } */
 
-    case OpIn =>
+    case OpIn => JSBoolean(VariableBoolean)
+      /*
       if(e2.isInstanceOf[JSObject]) {
          if(ToObject(e2).lookup(ToString(e1), memory).contains(cachedUndefined)) {
            JSBoolean(ConstantBoolean(false))
@@ -211,9 +230,9 @@ object JSSemantics {
          }
       } else {
          throw new RuntimeException(e2 + " is not Object.")
-      }
+      }*/
 
-    //TODO case OpInstanceof =>
+    case OpInstanceof => JSBoolean(VariableBoolean)
     case OpEq => abstractEquality(e1, e2)
 
     case OpNEq => abstractEquality(e1, e2) match {
@@ -259,6 +278,8 @@ object JSSemantics {
       }
 
     case OpMul =>
+      JSNumber(VariableNumber)
+      /*
       val v1 = ToNumber(e1)
       val v2 = ToNumber(e2)
       if(v1.number == JSNaN || v2.number == JSNaN) {
@@ -271,9 +292,11 @@ object JSSemantics {
           }
           case JSNumber(VariableNumber) => JSNumber(VariableNumber)
         }
-      }
+      } */
 
     case OpDiv =>
+      JSNumber(VariableNumber)
+      /*
       val v1 = ToNumber(e1)
       val v2 = ToNumber(e2)
       if(v1.number == JSNaN || v2.number == JSNaN) {
@@ -286,9 +309,11 @@ object JSSemantics {
           }
           case JSNumber(VariableNumber) => JSNumber(VariableNumber)
         }
-      }
+      } */
 
     case OpMod =>
+      JSNumber(VariableNumber)
+      /*
       val v1 = ToNumber(e1)
       val v2 = ToNumber(e2)
       if(v1.number == JSNaN || v2.number == JSNaN) {
@@ -301,14 +326,91 @@ object JSSemantics {
           }
           case JSNumber(VariableNumber) => JSNumber(VariableNumber)
         }
-      }
+      } */
 
-    //TODO OpLShift, OpSpRShift, OpZfRShift, OpBAnd, OpBXor, OpBOr
+    case OpLShift =>
+      JSNumber(VariableNumber)
+      /*
+      val v1 = ToInt32(e1)
+      val v2 = ToInt32(e2)
+      v1 match {
+        case JSNumber(ConstantNumber(n1)) => v2 match {
+          case JSNumber(ConstantNumber(n2)) => JSNumber(ConstantNumber(n1.toInt << n2.toInt))
+          case _ => JSNumber(VariableNumber)
+        }
+        case _ => JSNumber(VariableNumber)
+      } */
+
+    case OpSpRShift =>
+      JSNumber(VariableNumber)
+      /*
+      val v1 = ToInt32(e1)
+      val v2 = ToInt32(e2)
+      v1 match {
+        case JSNumber(ConstantNumber(n1)) => v2 match {
+          case JSNumber(ConstantNumber(n2)) => JSNumber(ConstantNumber(n1.toInt >> n2.toInt))
+          case _ => JSNumber(VariableNumber)
+        }
+        case _ => JSNumber(VariableNumber)
+      } */
+    case OpZfRShift =>
+      JSNumber(VariableNumber)
+      /*
+      val v1 = ToInt32(e1)
+      val v2 = ToInt32(e2)
+      v1 match {
+        case JSNumber(ConstantNumber(n1)) => v2 match {
+          case JSNumber(ConstantNumber(n2)) => JSNumber(ConstantNumber(n1.toInt >>> n2.toInt))
+          case _ => JSNumber(VariableNumber)
+        }
+        case _ => JSNumber(VariableNumber)
+      } */
+
+    case OpBAnd =>
+      JSNumber(VariableNumber)
+      /*
+      val v1 = ToInt32(e1)
+      val v2 = ToInt32(e2)
+      v1 match {
+        case JSNumber(ConstantNumber(n1)) => v2 match {
+          case JSNumber(ConstantNumber(n2)) => JSNumber(ConstantNumber(n1.toInt & n2.toInt))
+          case _ => JSNumber(VariableNumber)
+        }
+        case _ => JSNumber(VariableNumber)
+      } */
+
+    case OpBOr =>
+      JSNumber(VariableNumber)
+      /*
+      val v1 = ToInt32(e1)
+      val v2 = ToInt32(e2)
+      v1 match {
+        case JSNumber(ConstantNumber(n1)) => v2 match {
+          case JSNumber(ConstantNumber(n2)) => JSNumber(ConstantNumber(n1.toInt | n2.toInt))
+          case _ => JSNumber(VariableNumber)
+        }
+        case _ => JSNumber(VariableNumber)
+      } */
+
+    case OpBXor =>
+      JSNumber(VariableNumber)
+      /*
+      val v1 = ToInt32(e1)
+      val v2 = ToInt32(e2)
+      v1 match {
+        case JSNumber(ConstantNumber(n1)) => v2 match {
+          case JSNumber(ConstantNumber(n2)) => JSNumber(ConstantNumber(n1.toInt ^ n2.toInt))
+          case _ => JSNumber(VariableNumber)
+        }
+        case _ => JSNumber(VariableNumber)
+      } */
 
     case OpAdd =>
       val p1 = ToPrimitive(e1)
       val p2 = ToPrimitive(e2)
       if (isString(p1) || isString(p2)) {
+        JSString(VariableString)
+        /*
         val s1 = ToString(p1)
         val s2 = ToString(p2)
         s1 match {
@@ -317,8 +419,10 @@ object JSSemantics {
             case JSString(VariableString) => JSString(VariableString)
           }
           case JSString(VariableString) => JSString(VariableString)
-        }
+        } */
       } else {
+        JSNumber(VariableNumber)
+        /*
         val n1 = ToNumber(p1)
         val n2 = ToNumber(p2)
         n1 match {
@@ -332,11 +436,11 @@ object JSSemantics {
             case JSNumber(JSNaN) => JSNumber(JSNaN)
             case _ => JSNumber(VariableNumber)
           }
-        }
+        }  */
       }
 
     case OpSub =>
-      //JSNumber(VariableNumber)
+      JSNumber(VariableNumber)/*
       val num1 = ToNumber(e1)
       val num2 = ToNumber(e2)
       if(num1.number == VariableNumber || num2.number == VariableNumber) {
@@ -349,7 +453,7 @@ object JSSemantics {
             case JSNumber(ConstantNumber(number2)) => JSNumber(ConstantNumber(number1 - number2))
           }
         }
-      }
+      }*/
 
     //TODO
   }
@@ -361,20 +465,22 @@ object JSSemantics {
       op match {
         case PostfixInc =>
           oldValues.foreach {
-            case JSNumber(ConstantNumber(n)) => memory.putValue(ref, JSNumber(ConstantNumber(n + 1)))
+            case JSNumber(ConstantNumber(n)) =>
+              memory.putValue(ref, JSNumber(VariableNumber))
             case _ =>
           }
           oldValues
         case PostfixDec =>
           oldValues.foreach {
-            case JSNumber(ConstantNumber(n)) => memory.putValue(ref, JSNumber(ConstantNumber(n - 1)))
+            case JSNumber(ConstantNumber(n)) =>
+              memory.putValue(ref, JSNumber(VariableNumber))
             case _ =>
           }
           oldValues
         case PrefixInc =>
           oldValues.map {
             case JSNumber(ConstantNumber(n)) =>
-              val newVlaue = JSNumber(ConstantNumber(n + 1))
+              val newVlaue = JSNumber(VariableNumber)
               memory.putValue(ref, newVlaue)
               newVlaue
             case num => num
@@ -382,7 +488,7 @@ object JSSemantics {
         case PrefixDec =>
           oldValues.map {
             case JSNumber(ConstantNumber(n)) =>
-              val newValue = JSNumber(ConstantNumber(n + 1))
+              val newValue = JSNumber(VariableNumber)
               memory.putValue(ref, newValue)
               newValue
             case num => num
@@ -402,14 +508,16 @@ object JSSemantics {
     case JSNull => JSBoolean(ConstantBoolean(false))
     case JSString(ConstantString("")) => JSBoolean(ConstantBoolean(false))
     case JSString(ConstantString(_)) | JSString(VariableString) => JSBoolean(ConstantBoolean(true))
-    case JSObject(_) => JSBoolean(ConstantBoolean(true))
-    case _ => throw new RuntimeException("Unknown value in ToBoolean.")
+    case JSObject(_,_) => JSBoolean(ConstantBoolean(true))
+    case JSAny => JSBoolean(VariableBoolean)
+    case _ => throw new RuntimeException("Unknown value in ToBoolean. " + obj)
   }
 
 
   def ToNumber(obj: JSValue): JSNumber = obj match {
     case n: JSNumber => n
     case JSUndefined => JSNumber(JSNaN)
+    case JSNull => JSNumber(ConstantNumber(0))
     case JSBoolean(ConstantBoolean(true)) => JSNumber(ConstantNumber(1))
     case JSBoolean(ConstantBoolean(false)) => JSNumber(ConstantNumber(0))
     case JSBoolean(VariableBoolean) => JSNumber(VariableNumber)
@@ -421,6 +529,7 @@ object JSSemantics {
       } catch {
         case _: Throwable => JSNumber(JSNaN)
       }
+    case JSAny => JSNumber(VariableNumber)
     case o: JSObject => JSNumber(JSNaN) //ToPrimitive
     case miss => throw new RuntimeException("Unknown value in ToNumber." + miss)
   }
@@ -429,7 +538,12 @@ object JSSemantics {
     case _: JSReference => throw new RuntimeException("Reference :" + value +"cannot be converted to Object.")
     case obj : JSObject => obj
     case str : JSString => createStringObject(str)
-    case _ => JSObject(collection.mutable.Map())//throw new RuntimeException("TODO ToObject with :" + value)
+    case num : JSNumber => createNumberObject(num)
+    case JSAny =>
+      val anyObject = JSObject(collection.mutable.Map())
+      anyObject.isAbstract = true
+      anyObject
+    case _ => throw new RuntimeException("TODO ToObject with :" + value)
   }
 
   def canToObject(value : JSValue) : Boolean = value match {
@@ -447,7 +561,7 @@ object JSSemantics {
     case JSNumber(JSNaN) => JSString(ConstantString("NaN"))
     case JSNumber(ConstantNumber(n)) => numberToJSString(n)
     case JSNumber(VariableNumber) => JSString(VariableString)
-    case JSObject(_) => JSString(VariableString)
+    case JSObject(_,_) => JSString(VariableString)
     case _ => throw new RuntimeException("Unknown value in ToString." + obj)
   }
 
