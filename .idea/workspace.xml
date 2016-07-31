@@ -3,18 +3,6 @@
   <component name="ChangeListManager">
     <list default="true" id="b6e825ce-1f5e-47f0-820e-dbb376fe10ff" name="Default" comment="">
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/build.sbt" afterPath="$PROJECT_DIR$/build.sbt" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/main/scala-2.11/AAM.scala" afterPath="$PROJECT_DIR$/src/main/scala-2.11/AAM.scala" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/main/scala-2.11/AAMHelper.scala" afterPath="$PROJECT_DIR$/src/main/scala-2.11/AAMHelper.scala" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/main/scala-2.11/GarbageCollector.scala" afterPath="$PROJECT_DIR$/src/main/scala-2.11/GarbageCollector.scala" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/main/scala-2.11/GenerateAST.scala" afterPath="$PROJECT_DIR$/src/main/scala-2.11/GenerateAST.scala" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/main/scala-2.11/JSBuiltIn.scala" afterPath="$PROJECT_DIR$/src/main/scala-2.11/JSBuiltIn.scala" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/main/scala-2.11/JSSemantics.scala" afterPath="$PROJECT_DIR$/src/main/scala-2.11/JSSemantics.scala" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/main/scala-2.11/JSValue.scala" afterPath="$PROJECT_DIR$/src/main/scala-2.11/JSValue.scala" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/main/scala-2.11/Main.scala" afterPath="$PROJECT_DIR$/src/main/scala-2.11/Main.scala" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/main/scala-2.11/Memory.scala" afterPath="$PROJECT_DIR$/src/main/scala-2.11/Memory.scala" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/target/.history" afterPath="$PROJECT_DIR$/target/.history" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/test.js" afterPath="$PROJECT_DIR$/test.js" />
     </list>
     <ignored path="$PROJECT_DIR$/target/resolution-cache/" />
     <ignored path="$PROJECT_DIR$/target/streams/" />
@@ -81,7 +69,7 @@
         <entry file="file://$PROJECT_DIR$/test.js">
           <provider selected="true" editor-type-id="text-editor">
             <state relative-caret-position="110">
-              <caret line="5" column="51" selection-start-line="5" selection-start-column="5" selection-end-line="5" selection-end-column="5" />
+              <caret line="5" column="5" selection-start-line="5" selection-start-column="5" selection-end-line="5" selection-end-column="5" />
               <folding />
             </state>
           </provider>
@@ -760,7 +748,7 @@
     </recent_temporary>
   </component>
   <component name="SbtLocalSettings">
-    <option name="lastUpdateTimestamp" value="1469630434213" />
+    <option name="lastUpdateTimestamp" value="1469945889094" />
     <option name="availableProjects">
       <map>
         <entry>
@@ -845,7 +833,14 @@
       <option name="project" value="LOCAL" />
       <updated>1466665036228</updated>
     </task>
-    <option name="localTasksCounter" value="7" />
+    <task id="LOCAL-00007" summary="final">
+      <created>1469946041308</created>
+      <option name="number" value="00007" />
+      <option name="presentableId" value="LOCAL-00007" />
+      <option name="project" value="LOCAL" />
+      <updated>1469946041308</updated>
+    </task>
+    <option name="localTasksCounter" value="8" />
     <servers />
   </component>
   <component name="TodoView">
@@ -859,10 +854,11 @@
   </component>
   <component name="ToolWindowManager">
     <frame x="0" y="0" width="1680" height="1050" extended-state="0" />
-    <editor active="true" />
+    <editor active="false" />
     <layout>
       <window_info id="Palette" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="0" side_tool="false" content_ui="tabs" />
       <window_info id="TODO" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.32744282" sideWeight="0.5" order="0" side_tool="false" content_ui="tabs" />
+      <window_info id="Messages" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.3253638" sideWeight="0.5" order="4" side_tool="false" content_ui="tabs" />
       <window_info id="SBT" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.3296433" sideWeight="0.5" order="4" side_tool="false" content_ui="tabs" />
       <window_info id="Palette&#9;" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
       <window_info id="Event Log" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.6767152" sideWeight="0.5049261" order="3" side_tool="true" content_ui="tabs" />
@@ -870,12 +866,11 @@
       <window_info id="Version Control" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.32952183" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
       <window_info id="Terminal" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.32952183" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
       <window_info id="Designer" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="0" side_tool="false" content_ui="tabs" />
-      <window_info id="Project" active="true" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.22229064" sideWeight="0.49457365" order="4" side_tool="false" content_ui="combo" />
+      <window_info id="Project" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.22229064" sideWeight="0.49457365" order="4" side_tool="false" content_ui="combo" />
       <window_info id="Structure" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="1" side_tool="true" content_ui="tabs" />
       <window_info id="Ant Build" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="3" side_tool="false" content_ui="tabs" />
       <window_info id="UI Designer" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
       <window_info id="Favorites" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.22229064" sideWeight="0.50542635" order="3" side_tool="true" content_ui="tabs" />
-      <window_info id="Messages" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.3253638" sideWeight="0.5" order="4" side_tool="false" content_ui="tabs" />
       <window_info id="Run" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.7151767" sideWeight="0.49507388" order="5" side_tool="false" content_ui="tabs" />
       <window_info id="Coverage" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.3294335" sideWeight="0.5" order="5" side_tool="true" content_ui="tabs" />
       <window_info id="Find" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.32848233" sideWeight="0.5" order="6" side_tool="false" content_ui="tabs" />
@@ -899,7 +894,8 @@
     <MESSAGE value="refactor store copy" />
     <MESSAGE value="pass sunspider-3d-morph" />
     <MESSAGE value="add built-in objects and functions" />
-    <option name="LAST_COMMIT_MESSAGE" value="add built-in objects and functions" />
+    <MESSAGE value="final" />
+    <option name="LAST_COMMIT_MESSAGE" value="final" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
@@ -1192,7 +1188,7 @@
     <entry file="file://$PROJECT_DIR$/test.js">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="110">
-          <caret line="5" column="51" selection-start-line="5" selection-start-column="5" selection-end-line="5" selection-end-column="5" />
+          <caret line="5" column="5" selection-start-line="5" selection-start-column="5" selection-end-line="5" selection-end-column="5" />
           <folding />
         </state>
       </provider>
