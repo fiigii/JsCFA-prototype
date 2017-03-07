@@ -16,7 +16,7 @@ object Main {
     println("AST :")
     DecorateAST.mapToAST.foreach{
       case (id, t) => println(id + " :: " + t)
-    }*/
+    }   */
 
     println("Disk : ")
     disk.foreach{
@@ -25,6 +25,7 @@ object Main {
           println("    " + v + "\n")
         }
     }
+
 
     println("\n\nResult : ")
     DecorateAST.mapToAST.foreach {
