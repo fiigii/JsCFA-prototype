@@ -92,12 +92,12 @@ var a2 = g(1, 10);
  
  x -> 
      JSString(VariableString)
+     JSNumber(ConstantNumber(1.0))
      Object : 
          JSString(ConstantString(x)) -> JSReference(21,-1)
          JSString(ConstantString(__proto__)) -> JSReference(23,-1)
          JSString(ConstantString(constructor)) -> JSReference(24,-1)
  
-     JSNumber(ConstantNumber(1.0))
  g -> 
      FunctionObject : 
  function g(x, y) {
