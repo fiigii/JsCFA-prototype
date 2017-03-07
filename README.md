@@ -77,7 +77,7 @@ var a1 = g("a1", 1);
 var a2 = g(1, 10);
  ```
  
- Analysis result:
+ There is a loop pointer that represents the recursive data type in the analysis result:
  ```
  a0 -> 
      JSString(ConstantString(a0))
