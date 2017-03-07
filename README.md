@@ -1,7 +1,7 @@
 # JsCFA
 ## An Abstract Interpreter for JavaScript with Perfect Call/Return Matching.
 
-This a control flow analyzer for JavaScript based on h-CFA.
+This a control flow analyzer for JavaScript based on [h-CFA](http://dc.uwm.edu/etd/1300/).
 JsCFA can match call/return flow perfectly, and it filters local data flow (stack variables) via abstract garbage collection.
 Therefore, JsCFA provides very precise result of value-flow analysis. 
 
